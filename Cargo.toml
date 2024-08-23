@@ -1,7 +1,14 @@
-[package]
-name = "maya"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+# 指定工作区成员的路径，这里是"./crates/*"，意味着包含crates目录下的所有包。
+members  = ["crates/*"] 
+# 指定使用的依赖解析器版本，这里是"2"
+resolver = "2"
+
+[workspace.package]
+# 指定Rust版本，这里是"2021"
+edition    = "2021"
+# 开源许可证
+license    = "MIT"
 
 [profile.dev]
 opt-level = 0
@@ -9,6 +16,7 @@ opt-level = 0
 [profile.release]
 opt-level = 3
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
+
+[workspace.dependencies]
+clear_node_modules                                = { version = "0.1.0", path = "crates/clear_node_modules" }
