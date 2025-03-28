@@ -1,5 +1,5 @@
-use std::path::PathBuf;
-use clap::{Parser, Subcommand};
+use std::path::PathBuf; // 用于处理文件路径
+use clap::{Parser, Subcommand}; // clap 是一个流行的 Rust 库，用于解析命令行参数, Parser 和 Subcommand 是 clap 提供的宏和特性，用于定义命令和子命令
 
 #[derive(Parser)]
 #[command(author, version, about = "Maya CLI 工具集")]
