@@ -1,0 +1,10 @@
+[package]
+name = "clear_lock"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]
+tempfile = "3.5.0" 
