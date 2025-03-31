@@ -196,7 +196,6 @@ dependencies = [
  "clap",
  "clear_lock",
  "clear_node_modules",
- "wasm-bindgen",
 ]
 
 [[package]]
