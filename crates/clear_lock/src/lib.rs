@@ -1,14 +1,16 @@
 use std::fs;
 use std::path::Path;
 use std::io;
+use wasm_bindgen::prelude::*;
 
 /// 清除目录中的锁文件 (package-lock.json, yarn.lock 等)
-pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> io::Result<usize> {
+#[wasm_bindgen]
+pub fn clear_lock_files(dir: String) -> Result<usize, JsValue> {
     let lock_files = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
     let mut count = 0;
     
     // 遍历目录
-    clear_lock_files_in_dir(dir.as_ref(), &lock_files, &mut count)?;
+    clear_lock_files_in_dir(Path::new(&dir), &lock_files, &mut count).map_err(|e| JsValue::from_str(&e.to_string()))?;
     
     Ok(count)
 }
@@ -66,4 +68,4 @@ mod tests {
         assert_eq!(count, 1);
         assert!(!lock_path.exists());
     }
-} 
+}
