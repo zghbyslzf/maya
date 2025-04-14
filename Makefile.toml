@@ -29,7 +29,7 @@ dependencies = ["wasm-bindgen"]
 command = "powershell"
 args = [
   "-Command",
-  "$pkgJson = Get-Content 'pkg/package.json' | ConvertFrom-Json; $version = [version]$pkgJson.version; $pkgJson.version = \"$($version.Major).$($version.Minor).$($version.Build + 1)\"; $pkgJson | ConvertTo-Json -Depth 100 | Set-Content 'pkg/package.json'"
+  "$pkgJson = Get-Content 'pkg/package.json' | ConvertFrom-Json; $version = [version]$pkgJson.version; $pkgJson.version = \"$($version.Major).$($version.Minor).$($version.Build + 1)\"; $pkgJson | ConvertTo-Json -Depth 100 | ForEach-Object { $_ -replace '    ', '  ' } | Set-Content 'pkg/package.json'"
 ]
 workspace = false
 cwd = "."
