@@ -1,19 +1,21 @@
 {
-  "name": "maya-cli-rs",
-  "version": "0.1.0",
-  "description": "A Rust-based package",
-  "main": "maya.js",
-  "types": "maya.d.ts",
-  "files": [
-    "maya.js",
-    "maya.d.ts",
-    "maya_bg.wasm",
-    "maya_bg.wasm.d.ts"
-  ],
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "MIT"
-} 
+    "name":  "maya-cli-rs",
+    "version":  "0.1.1",
+    "description":  "A Rust-based package",
+    "main":  "maya.js",
+    "types":  "maya.d.ts",
+    "files":  [
+                  "maya.js",
+                  "maya.d.ts",
+                  "maya_bg.wasm",
+                  "maya_bg.wasm.d.ts"
+              ],
+    "scripts":  {
+                    "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
+                },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "MIT"
+}

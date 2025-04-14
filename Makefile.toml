@@ -24,9 +24,37 @@ args = [
 workspace = false
 cwd = "."
 
+[tasks.update-version]
+dependencies = ["wasm-bindgen"]
+command = "powershell"
+args = [
+  "-Command",
+  "$pkgJson = Get-Content 'pkg/package.json' | ConvertFrom-Json; $version = [version]$pkgJson.version; $pkgJson.version = \"$($version.Major).$($version.Minor).$($version.Build + 1)\"; $pkgJson | ConvertTo-Json -Depth 100 | Set-Content 'pkg/package.json'"
+]
+workspace = false
+cwd = "."
+
+
+[tasks.npm-publish]
+dependencies = ["update-version"]
+command = "npm.cmd"
+args = ["publish", "--registry=https://registry.npmjs.org"]
+workspace = false
+cwd = "pkg"
+
+[tasks.publish-all]
+dependencies = ["npm-publish"]
+command = "powershell"
+args = ["-Command", "Write-Host 'Publish completed!'"]
+workspace = false
+cwd = "."
+
 [tasks.build-push]
 command = "powershell"
 args = ["-Command", "Write-Host 'Build and WASM bindgen completed!'"]
-dependencies = ["build", "wasm-bindgen"]
+dependencies = ["build", "wasm-bindgen", "update-version", "npm-publish", "publish-all"]
 workspace = false
 cwd = "."
+
+
+
