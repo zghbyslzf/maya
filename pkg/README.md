@@ -1,7 +1,7 @@
 ## 1. 安装
 
 ```
-npm i maya-cli-rs
+npm i maya-cli-rs -g
 ```
 
 ## 2. 使用
