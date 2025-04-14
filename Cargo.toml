@@ -26,7 +26,7 @@ opt-level = 3
 [workspace.dependencies]
 clear_node_modules = { version = "0.1.0", path = "crates/clear_node_modules" }
 clear_lock = { version = "0.1.0", path = "crates/clear_lock" }
-maya = { version = "0.1.0", path = "crates/cli" }
+maya = { version = "0.1.0", path = "src" }
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }

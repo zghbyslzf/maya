@@ -1,0 +1,32 @@
+[tasks.build]
+command = "cargo"
+args = ["build", "--target", "wasm32-unknown-unknown", "--release"]
+workspace = false # 关键修复：禁止在 workspace 成员中执行此任务
+cwd = "." # 确保命令在根目录执行
+
+[tasks.pkg]
+dependencies = ["build"]
+command = "cmd"
+args = ["/c", "if not exist pkg mkdir pkg"]
+workspace = false
+cwd = "."
+
+[tasks.wasm-bindgen]
+dependencies = ["pkg"]
+command = "wasm-bindgen"
+args = [
+  "target/wasm32-unknown-unknown/release/maya.wasm",
+  "--out-dir",
+  "./pkg",
+  "--target",
+  "nodejs"
+]
+workspace = false
+cwd = "."
+
+[tasks.build-push]
+command = "powershell"
+args = ["-Command", "Write-Host 'Build and WASM bindgen completed!'"]
+dependencies = ["build", "wasm-bindgen"]
+workspace = false
+cwd = "."
