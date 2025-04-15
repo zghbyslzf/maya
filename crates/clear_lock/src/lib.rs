@@ -2,6 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::io;
 use wasm_bindgen::prelude::*;
+use web_sys::console;
+
+
 
 /// 清除目录中的锁文件 (package-lock.json, yarn.lock 等)
 #[wasm_bindgen]
@@ -26,7 +29,7 @@ fn clear_lock_files_in_dir(dir: &Path, lock_files: &[&str], count: &mut usize) -
         if file_path.exists() {
             fs::remove_file(&file_path)?;
             *count += 1;
-            println!("已删除: {}", file_path.display());
+            console::log_1(&format!("已删除: {}", file_path.display()).into());
         }
     }
     

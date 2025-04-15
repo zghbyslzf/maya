@@ -1,6 +1,6 @@
 {
   "name":  "maya-cli-rs",
-  "version":  "0.1.22",
+  "version":  "0.1.25",
   "description":  "A Rust-based package",
   "main":  "maya.js",
   "types":  "maya.d.ts",

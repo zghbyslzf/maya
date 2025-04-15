@@ -187,6 +187,10 @@ module.exports.clear_node_modules = function(dir) {
     return ret[0] >>> 0;
 };
 
+module.exports.__wbg_log_c222819a41e063d3 = function(arg0) {
+    console.log(arg0);
+};
+
 module.exports.__wbindgen_debug_string = function(arg0, arg1) {
     const ret = debugString(arg1);
     const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -209,6 +213,10 @@ module.exports.__wbindgen_init_externref_table = function() {
 module.exports.__wbindgen_string_new = function(arg0, arg1) {
     const ret = getStringFromWasm0(arg0, arg1);
     return ret;
+};
+
+module.exports.__wbindgen_throw = function(arg0, arg1) {
+    throw new Error(getStringFromWasm0(arg0, arg1));
 };
 
 const path = require('path').join(__dirname, 'maya_bg.wasm');
