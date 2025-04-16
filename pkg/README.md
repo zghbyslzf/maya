@@ -10,4 +10,5 @@ npm i maya-cli-rs -g
 
 maya -c n # 清除node_modules
 maya -c lock # 清除package-lock.json, yarn.lock, pnpm-lock.yaml
+maya -g m # 会在当前目录下面执行 git add . && git commit -m 'update' && git push
 ```

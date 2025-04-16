@@ -42,10 +42,7 @@ fn main() {
                 }
             }
         }
-    } else {
-        eprintln!("请使用 -c 选项指定清理类型");
-    }
-    if let Some(git_ops) = &cli.git_ops {
+    } else if let Some(git_ops) = &cli.git_ops {
         if git_ops.len() == 1 && (git_ops[0] == "m" || git_ops[0] == "M") {
             match git_add_commit_push::git_add_commit_push(cli.path.to_string_lossy().to_string()) {
                 Ok(_) => println!("已完成 git add/commit/push 操作"),
