@@ -11,7 +11,7 @@ args = ["/c", "if not exist pkg mkdir pkg"]
 workspace = false
 cwd = "."
 
-[tasks.wasm-bindgen]
+[tasks.move-release]
 dependencies = ["pkg"]
 command = "powershell"
 args = [
@@ -22,7 +22,7 @@ workspace = false
 cwd = "."
 
 [tasks.update-version]
-dependencies = ["wasm-bindgen"]
+dependencies = ["move-release"]
 command = "powershell"
 args = [
   "-Command",
@@ -49,7 +49,7 @@ cwd = "."
 [tasks.build-push]
 command = "powershell"
 args = ["-Command", "Write-Host 'Build and WASM bindgen completed!'"]
-dependencies = ["build", "wasm-bindgen", "update-version", "npm-publish", "publish-all"]
+dependencies = ["build", "move-release", "update-version", "npm-publish", "publish-all"]
 workspace = false
 cwd = "."
 
