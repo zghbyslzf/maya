@@ -5,7 +5,7 @@
   "main":  "maya.js",
   "types":  "maya.d.ts",
   "bin":  {
-        "maya":  "./release/maya.exe"
+        "maya":  "./release/maya"
       },
   "files":  [
           "release"
