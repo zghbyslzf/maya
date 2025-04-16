@@ -6,7 +6,7 @@ resolver = "2"
 
 [package]
 name = "maya"
-version = "0.1.0"
+version = "0.1.43"
 edition = "2021"
 
 [workspace.package]

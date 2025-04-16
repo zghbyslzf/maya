@@ -1,11 +1,11 @@
 {
   "name":  "maya-cli-rs",
-  "version":  "0.1.39",
+  "version":  "0.1.43",
   "description":  "A Rust-based package",
   "main":  "maya.js",
   "types":  "maya.d.ts",
   "bin":  {
-        "maya":  "./release/maya"
+        "maya":  "./release/maya.exe"
       },
   "files":  [
           "release"
