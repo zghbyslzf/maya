@@ -1,7 +1,7 @@
 ## 1. 安装
 
 ```
-npm install -g @maya/cli
+npm i maya-cli-rs -g
 ```
 
 ## 2. 使用
