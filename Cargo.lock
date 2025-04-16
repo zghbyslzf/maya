@@ -153,6 +153,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "git_add_commit_push"
+version = "0.1.0"
+
+[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -183,6 +187,7 @@ dependencies = [
  "clap",
  "clear_lock",
  "clear_node_modules",
+ "git_add_commit_push",
 ]
 
 [[package]]
