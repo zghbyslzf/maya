@@ -1,6 +1,6 @@
 [tasks.build]
 command = "cargo"
-args = ["build", "--target", "wasm32-unknown-unknown", "--release"]
+args = ["build", "--release"]
 workspace = false # 关键修复：禁止在 workspace 成员中执行此任务
 cwd = "." # 确保命令在根目录执行
 
