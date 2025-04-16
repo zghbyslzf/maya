@@ -5,29 +5,23 @@
   "main":  "maya.js",
   "types":  "maya.d.ts",
   "bin":  {
-        "maya":  "./bin/maya.js"
-      },
+    "maya":  "./release/maya.exe"
+  },
   "files":  [
-          "maya.js",
-          "maya.d.ts",
-          "maya_bg.wasm",
-          "maya_bg.wasm.d.ts",
-          "bin"
-        ],
+    "release"
+  ],
   "repository":  {
-             "type":  "git",
-             "url":  "git+https://github.com/zghbyslzf/maya.git"
-           },
+    "type":  "git",
+    "url":  "git+https://github.com/zghbyslzf/maya.git"
+  },
   "scripts":  {
-          "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
-        },
-  "keywords":  [
-
-         ],
+    "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
+  },
+  "keywords":  [],
   "author":  "Maya \u003czghbyslzf@163.com\u003e (https://github.com/zghbyslzf)",
   "license":  "MIT",
   "bugs":  {
-         "url":  "https://github.com/zghbyslzf/maya/issues"
-       },
+    "url":  "https://github.com/zghbyslzf/maya/issues"
+  },
   "homepage":  "https://github.com/zghbyslzf/maya#readme"
 }
