@@ -1,0 +1,29 @@
+{
+  "name":  "maya-cli-rs",
+  "version":  "0.1.36",
+  "description":  "A Rust-based package",
+  "main":  "maya.js",
+  "types":  "maya.d.ts",
+  "bin":  {
+        "maya":  "./release/maya.exe"
+      },
+  "files":  [
+          "release"
+        ],
+  "repository":  {
+             "type":  "git",
+             "url":  "git+https://github.com/zghbyslzf/maya.git"
+           },
+  "scripts":  {
+          "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
+        },
+  "keywords":  [
+
+         ],
+  "author":  "Maya \u003czghbyslzf@163.com\u003e (https://github.com/zghbyslzf)",
+  "license":  "MIT",
+  "bugs":  {
+         "url":  "https://github.com/zghbyslzf/maya/issues"
+       },
+  "homepage":  "https://github.com/zghbyslzf/maya#readme"
+}
