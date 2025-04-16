@@ -13,13 +13,10 @@ cwd = "."
 
 [tasks.wasm-bindgen]
 dependencies = ["pkg"]
-command = "wasm-bindgen"
+command = "powershell"
 args = [
-  "target/wasm32-unknown-unknown/release/maya.wasm",
-  "--out-dir",
-  "./pkg",
-  "--target",
-  "nodejs"
+  "-Command",
+  "if (Test-Path pkg/release) { Remove-Item -Recurse -Force pkg/release }; if (Test-Path target/release) { New-Item -ItemType Directory -Force -Path pkg/release; Copy-Item target/release/* pkg/release/ -Recurse }"
 ]
 workspace = false
 cwd = "."
