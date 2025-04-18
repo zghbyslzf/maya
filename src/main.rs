@@ -31,7 +31,7 @@ fn main() {
     } else if let Some(git_ops) = &cli.git_ops {
         git_ops::handle_git_ops(git_ops, &cli.path);
     } else if cli.pack_vite {
-        vite_pack_add_zip::handle_vite_pack(&cli.path);
+        vite_pack_add_zip::handle_vite_pack();
     } else {
         eprintln!("请使用 -c , -g 或 -p 选项指定操作类型");
     }

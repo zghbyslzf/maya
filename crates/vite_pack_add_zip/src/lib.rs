@@ -5,36 +5,39 @@ use walkdir::WalkDir;
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
-pub fn handle_vite_pack(path: &PathBuf) {
+pub fn handle_vite_pack() {
     // 检查vite配置文件
-    let vite_config = find_vite_config(path);
+    let vite_config = find_vite_config();
 
     if let Some(config_path) = vite_config {
         // 读取outDir配置
         let out_dir = get_out_dir(&config_path).unwrap_or_else(|| "dist".to_string());
 
         // 检查outDir文件夹是否存在
-        let target_dir = path.join(&out_dir);
+        let current_dir = std::env::current_dir().unwrap();
+        let target_dir = current_dir.join(&out_dir);
         if !target_dir.exists() {
             // 检查dist文件夹是否存在
-            let dist_dir = path.join("dist");
+            let dist_dir = current_dir.join("dist");
             if dist_dir.exists() {
-                create_zip(&dist_dir, path).unwrap();
+                create_zip(&dist_dir, &current_dir).unwrap();
             } else {
                 println!("没有检测到对应打包文件夹，请检查Vite配置");
             }
         } else {
-            create_zip(&target_dir, path).unwrap();
+            create_zip(&target_dir, &current_dir).unwrap();
         }
     } else {
         println!("没有检测到vite.config.js或vite.config.ts文件");
     }
 }
 
-fn find_vite_config(path: &Path) -> Option<PathBuf> {
-    let js_config = path.join("vite.config.js");
-    let ts_config = path.join("vite.config.ts");
-
+fn find_vite_config() -> Option<PathBuf> {
+    let current_dir = std::env::current_dir().ok()?;
+    println!("当前目录: {:?}", current_dir);
+    let js_config = current_dir.join("vite.config.js");
+    let ts_config = current_dir.join("vite.config.ts");
+    println!("检查js配置路径: {:?}", js_config);
     if js_config.exists() {
         Some(js_config)
     } else if ts_config.exists() {
