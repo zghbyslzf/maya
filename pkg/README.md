@@ -13,4 +13,5 @@ npm i maya-cli-rs -g
 maya -c n # 清除node_modules
 maya -c lock # 清除package-lock.json, yarn.lock, pnpm-lock.yaml
 maya -g m # 会在当前目录下面执行 git add . && git commit -m 'update' && git push
+maya -p a # 会检测vite的outDir配置，然后把对应的文件夹打包成zip
 ```
