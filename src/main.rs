@@ -17,6 +17,10 @@ struct Cli {
     path: PathBuf,
     #[arg(short = 'g', long, num_args = 1.., value_name = "GIT_OPS")]
     git_ops: Option<Vec<String>>,
+
+    /// 打包Vite项目输出目录
+    #[arg(short = 'p', long)]
+    pack_vite: bool,
 }
 
 fn main() {
@@ -26,7 +30,9 @@ fn main() {
         clean_ops::handle_clean_ops(types, &cli.path);
     } else if let Some(git_ops) = &cli.git_ops {
         git_ops::handle_git_ops(git_ops, &cli.path);
+    } else if cli.pack_vite {
+        vite_pack_add_zip::handle_vite_pack(&cli.path);
     } else {
-        eprintln!("请使用 -c , -g 选项指定清理类型");
+        eprintln!("请使用 -c , -g 或 -p 选项指定操作类型");
     }
 }
