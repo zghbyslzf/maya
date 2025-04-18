@@ -38,6 +38,7 @@ fn find_vite_config() -> Option<PathBuf> {
     let js_config = current_dir.join("vite.config.js");
     let ts_config = current_dir.join("vite.config.ts");
     println!("检查js配置路径: {:?}", js_config);
+    println!("检查js配置路径2: {:?}", js_config.exists());
     if js_config.exists() {
         Some(js_config)
     } else if ts_config.exists() {
@@ -50,18 +51,37 @@ fn find_vite_config() -> Option<PathBuf> {
 fn get_out_dir(config_path: &Path) -> Option<String> {
     let content = fs::read_to_string(config_path).ok()?;
 
-    // 简单解析outDir配置
-    if content.contains("outDir") {
-        let lines: Vec<&str> = content.lines().collect();
-        for line in lines {
-            if line.trim().starts_with("outDir") {
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() > 1 {
-                    let dir = parts[1]
-                        .trim()
-                        .trim_matches(|c| c == '"' || c == '\'' || c == ',' || c == ' ');
-                    return Some(dir.to_string());
-                }
+    // 增强配置解析逻辑
+    let re = regex::Regex::new(r#"(outDir\s*[:=]\s*['"]?)([^,'"}\s]+)['"]?"#).unwrap();
+
+    // 先尝试正则匹配
+    if let Some(caps) = re.captures(&content) {
+        if let Some(m) = caps.get(2) {
+            return Some(
+                m.as_str()
+                    .trim_matches(|c| c == '"' || c == '\'')
+                    .to_string(),
+            );
+        }
+    }
+
+    // 处理嵌套对象结构
+    let build_block_re =
+        regex::Regex::new(r#"(?s)build\s*:\s*\{.*?outDir\s*[:=]\s*['"]?([^'"},]+)"#).unwrap();
+    if let Some(caps) = build_block_re.captures(&content) {
+        if let Some(block) = caps.get(1) {
+            if let Some(m) = regex::Regex::new(r#"outDir[=:]s*['"]?([^,'"}\s]+)['"]?"#)
+                .unwrap()
+                .find(block.as_str())
+            {
+                let dir = m
+                    .as_str()
+                    .split(&[':', '='][..])
+                    .nth(1)
+                    .unwrap()
+                    .trim()
+                    .trim_matches(|c| c == '"' || c == '\'' || c == ',' || c == ' ');
+                return Some(dir.to_string());
             }
         }
     }
