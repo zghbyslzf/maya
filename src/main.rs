@@ -1,6 +1,10 @@
 ﻿use clap::Parser;
 use std::path::PathBuf; // clap 是一个流行的 Rust 库，用于解析命令行参数
 
+// 导入自定义模块
+mod clean_ops;
+mod git_ops;
+
 #[derive(Parser)]
 #[command(author, version, about = "Maya CLI 工具集")]
 struct Cli {
@@ -19,39 +23,10 @@ fn main() {
     let cli = Cli::parse();
 
     if let Some(types) = &cli.clean_types {
-        for clean_type in types {
-            match clean_type.as_str() {
-                "n" | "node_modules" => {
-                    println!("清理目录 {} 中的 node_modules 文件夹", cli.path.display());
-                    match clear_node_modules::clear_node_modules(
-                        cli.path.to_string_lossy().to_string(),
-                    ) {
-                        Ok(count) => println!("已清理 {} 个 node_modules 文件夹", count),
-                        Err(e) => eprintln!("清理过程中出错: {:?}", e),
-                    }
-                }
-                "lock" => {
-                    println!("清理目录 {} 中的锁文件", cli.path.display());
-                    match clear_lock::clear_lock_files(cli.path.to_string_lossy().to_string()) {
-                        Ok(count) => println!("已清理 {} 个锁文件", count),
-                        Err(e) => eprintln!("清理过程中出错: {:?}", e),
-                    }
-                }
-                _ => {
-                    eprintln!("跳过不支持的清理类型: {}", clean_type);
-                }
-            }
-        }
+        clean_ops::handle_clean_ops(types, &cli.path);
     } else if let Some(git_ops) = &cli.git_ops {
-        if git_ops.len() == 1 && (git_ops[0] == "m" || git_ops[0] == "M") {
-            match git_add_commit_push::git_add_commit_push(cli.path.to_string_lossy().to_string()) {
-                Ok(_) => println!("已完成 git add/commit/push 操作"),
-                Err(e) => eprintln!("git 操作出错: {:?}", e),
-            }
-        } else {
-            eprintln!("暂不支持的 git 操作参数: {:?}", git_ops);
-        }
+        git_ops::handle_git_ops(git_ops, &cli.path);
     } else {
-        eprintln!("请使用 -c 选项指定清理类型");
+        eprintln!("请使用 -c , -g 选项指定清理类型");
     }
 }
