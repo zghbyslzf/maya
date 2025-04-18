@@ -67,7 +67,8 @@ fn get_out_dir(config_path: &Path) -> Option<String> {
 }
 
 fn create_zip(source_dir: &Path, dest_path: &Path) -> std::io::Result<()> {
-    let zip_path = dest_path.join("package.zip");
+    let folder_name = source_dir.file_name().unwrap_or_default().to_str().unwrap();
+    let zip_path = dest_path.join(format!("{}.zip", folder_name));
     let file = fs::File::create(&zip_path)?;
     let mut zip = ZipWriter::new(file);
 
