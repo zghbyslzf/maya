@@ -4,6 +4,8 @@
 npm i maya-cli-rs -g
 ```
 
+> 注意：暂时只支持 windows 系统
+
 ## 2. 使用
 
 ```bash
