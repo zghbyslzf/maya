@@ -10,3 +10,7 @@ regex = "1.10.3"
 path-clean = "1.0.1"
 glob = "0.3.1"
 serde_json = "1.0"
+swc_core = "0.86.0"
+swc_ecma_ast = "0.110.0"
+swc_ecma_parser = "0.141.0"
+swc_common = { version = "0.32.0", features = ["tty-emitter"] }
