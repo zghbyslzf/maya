@@ -21,6 +21,10 @@ struct Cli {
     /// 打包Vite项目输出目录
     #[arg(short = 'p', long)]
     pack_vite: bool,
+
+    /// 将React组件转换为Vue组件
+    #[arg(short = 't', long = "transform", value_name = "FILE")]
+    transform_file: Option<String>,
 }
 
 fn main() {
@@ -32,7 +36,9 @@ fn main() {
         git_ops::handle_git_ops(git_ops, &cli.path);
     } else if cli.pack_vite {
         vite_pack_add_zip::handle_vite_pack();
+    } else if let Some(file) = &cli.transform_file {
+        react_to_vue::handle_react_to_vue(file);
     } else {
-        eprintln!("请使用 -c , -g 或 -p 选项指定操作类型");
+        eprintln!("请使用 -c, -g, -p 或 -t 选项指定操作类型");
     }
 }

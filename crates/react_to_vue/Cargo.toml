@@ -1,0 +1,12 @@
+[package]
+name = "react_to_vue"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+regex = "1.10.3"
+path-clean = "1.0.1"
+glob = "0.3.1"
+serde_json = "1.0"

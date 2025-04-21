@@ -31,6 +31,7 @@ vite_pack_add_zip = { version = "0.1.0", path = "crates/vite_pack_add_zip" }
 maya = { version = "0.1.0", path = "src" }
 
 [dependencies]
+react_to_vue = { path = "./crates/react_to_vue" }
 clap = { version = "4.0", features = ["derive"] }
 clear_node_modules = { workspace = true }
 clear_lock = { workspace = true }
