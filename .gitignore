@@ -1,6 +1,17 @@
 /target
 /node_modules
 /pkg/release
+/test
+/*/test
+/*/test/**
+/*/test/**/*
+/*/test/**/*.*
+
+*.tsx
+*.ts
+*.js
+*.jsx
+*.vue
 
 package.json
 package-lock.json
