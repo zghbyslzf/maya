@@ -18,9 +18,9 @@ struct Cli {
     #[arg(short = 'g', long, num_args = 1.., value_name = "GIT_OPS")]
     git_ops: Option<Vec<String>>,
 
-    /// 打包Vite项目输出目录
-    #[arg(short = 'p', long)]
-    pack_vite: bool,
+    /// 打包操作类型 (留空：Vite项目打包, g: 根据gitignore打包)
+    #[arg(short = 'p', long, value_name = "PACK_TYPE")]
+    pack_type: Option<String>,
 }
 
 fn main() {
@@ -30,8 +30,14 @@ fn main() {
         clean_ops::handle_clean_ops(types, &cli.path);
     } else if let Some(git_ops) = &cli.git_ops {
         git_ops::handle_git_ops(git_ops, &cli.path);
-    } else if cli.pack_vite {
-        vite_pack_add_zip::handle_vite_pack();
+    } else if let Some(pack_type) = &cli.pack_type {
+        match pack_type.as_str() {
+            "g" => gitignore_add_zip::handle_gitignore_pack(),
+            "a" => vite_pack_add_zip::handle_vite_pack(),
+            _ => {
+                println!("未知的打包类型: {}。使用 g (gitignore) 或 a (vite)。", pack_type);
+            }
+        }
     } else {
         eprintln!("请使用 -c , -g 或 -p 选项指定操作类型");
     }

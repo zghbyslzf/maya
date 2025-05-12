@@ -1,0 +1,10 @@
+[package]
+name = "gitignore_add_zip"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+walkdir = "2.5"
+zip = "2.6.1"
+ignore = "0.4.22"
