@@ -1,4 +1,4 @@
-[workspace]
+﻿[workspace]
 # 指定工作区成员的路径，这里是"./crates/*"，意味着包含crates目录下的所有包。
 members  = ["crates/*"] 
 # 指定使用的依赖解析器版本，这里是"2"
@@ -6,7 +6,7 @@ resolver = "2"
 
 [package]
 name = "maya"
-version = "0.1.47"
+version = "0.1.48"
 edition = "2021"
 
 [workspace.package]
@@ -36,4 +36,5 @@ clear_node_modules = { workspace = true }
 clear_lock = { workspace = true }
 git_add_commit_push = { workspace = true }
 vite_pack_add_zip = { workspace = true }
+
 
