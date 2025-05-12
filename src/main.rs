@@ -4,6 +4,7 @@ use std::path::PathBuf; // clap 是一个流行的 Rust 库，用于解析命令
 // 导入自定义模块
 mod clean_ops;
 mod git_ops;
+mod pack_ops;
 
 #[derive(Parser)]
 #[command(author, version, about = "Maya CLI 工具集")]
@@ -15,10 +16,12 @@ struct Cli {
     /// 操作目录路径，默认为当前目录
     #[arg(default_value = ".", value_name = "PATH")]
     path: PathBuf,
+    
+    /// Git相关操作
     #[arg(short = 'g', long, num_args = 1.., value_name = "GIT_OPS")]
     git_ops: Option<Vec<String>>,
 
-    /// 打包操作类型 (留空：Vite项目打包, g: 根据gitignore打包)
+    /// 打包操作类型 (g: 根据gitignore打包, a: Vite项目打包)
     #[arg(short = 'p', long, value_name = "PACK_TYPE")]
     pack_type: Option<String>,
 }
@@ -31,13 +34,7 @@ fn main() {
     } else if let Some(git_ops) = &cli.git_ops {
         git_ops::handle_git_ops(git_ops, &cli.path);
     } else if let Some(pack_type) = &cli.pack_type {
-        match pack_type.as_str() {
-            "g" => gitignore_add_zip::handle_gitignore_pack(),
-            "a" => vite_pack_add_zip::handle_vite_pack(),
-            _ => {
-                println!("未知的打包类型: {}。使用 g (gitignore) 或 a (vite)。", pack_type);
-            }
-        }
+        pack_ops::handle_pack_ops(pack_type);
     } else {
         eprintln!("请使用 -c , -g 或 -p 选项指定操作类型");
     }
