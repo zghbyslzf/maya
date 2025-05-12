@@ -95,7 +95,9 @@ fn create_zip(source_dir: &Path, dest_path: &Path) -> std::io::Result<()> {
     let file = fs::File::create(&zip_path)?;
     let mut zip = ZipWriter::new(file);
 
-    let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    // 在新版zip中，需要明确指定FileOptions的类型参数为()
+    let options: FileOptions<'_, ()> = FileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
 
     let walkdir = WalkDir::new(source_dir);
     let it = walkdir.into_iter().filter_map(|e| e.ok());
@@ -105,9 +107,12 @@ fn create_zip(source_dir: &Path, dest_path: &Path) -> std::io::Result<()> {
         let name = path.strip_prefix(source_dir).unwrap();
 
         if path.is_file() {
-            zip.start_file(name.to_str().unwrap(), options)?;
-            let mut f = fs::File::open(path)?;
-            std::io::copy(&mut f, &mut zip)?;
+            // 确保文件名是有效的Unicode
+            if let Some(name_str) = name.to_str() {
+                zip.start_file(name_str, options)?;
+                let mut f = fs::File::open(path)?;
+                std::io::copy(&mut f, &mut zip)?;
+            }
         }
     }
 
