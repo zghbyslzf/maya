@@ -6,7 +6,7 @@ resolver = "2"
 
 [package]
 name = "maya"
-version = "0.1.48"
+version = "0.1.49"
 edition = "2021"
 
 [workspace.package]
@@ -38,5 +38,6 @@ clear_lock = { workspace = true }
 git_add_commit_push = { workspace = true }
 vite_pack_add_zip = { workspace = true }
 gitignore_add_zip = { workspace = true }
+
 
 
