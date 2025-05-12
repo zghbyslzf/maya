@@ -1,4 +1,14 @@
+[tasks.update-cargo-version]
+command = "powershell"
+args = [
+  "-Command",
+  "$content = Get-Content 'Cargo.toml' -Raw -Encoding UTF8; $packageSection = [regex]::Match($content, '\\[package\\](.|\\n)*?(?=\\[)').Value; if(!$packageSection) { $packageSection = [regex]::Match($content, '\\[package\\](.|\\n)*').Value; }; $versionMatch = [regex]::Match($packageSection, 'version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\"'); if ($versionMatch.Success) { $major = $versionMatch.Groups[1].Value; $minor = $versionMatch.Groups[2].Value; $patch = [int]$versionMatch.Groups[3].Value + 1; $oldVersionStr = $versionMatch.Value; $newVersionStr = $oldVersionStr -replace '\"(\\d+)\\.(\\d+)\\.(\\d+)\"', ('\"' + $major + '.' + $minor + '.' + $patch + '\"'); $content = $content.Replace($oldVersionStr, $newVersionStr); $content | Out-File -FilePath 'Cargo.toml' -Encoding UTF8; Write-Host \"版本号已从 $major.$minor.$($patch-1) 更新到 $major.$minor.$patch\"; }"
+]
+workspace = false
+cwd = "."
+
 [tasks.build]
+dependencies = ["update-cargo-version"]
 command = "cargo"
 args = ["build", "--release"]
 workspace = false # 关键修复：禁止在 workspace 成员中执行此任务
