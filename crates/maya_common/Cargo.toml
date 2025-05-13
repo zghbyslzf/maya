@@ -1,11 +1,11 @@
 [package]
-name = "gitignore_add_zip"
+name = "maya_common"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+description = "共享库，包含Maya CLI工具集的通用功能"
 
 [dependencies]
 walkdir = { workspace = true }
 zip = { workspace = true }
-ignore = { workspace = true }
-maya_common = { workspace = true }
+regex = { workspace = true } 

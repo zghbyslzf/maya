@@ -3,9 +3,11 @@ name = "vite_pack_add_zip"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+description = "会检测vite的outDir配置，然后把对应的文件夹打包成zip"
 
 [dependencies]
-zip = "2.6.1"
-serde_json = "1.0"
-walkdir = "2.5"
-regex = "1.10.3"
+zip = { workspace = true }
+serde_json = { workspace = true }
+walkdir = { workspace = true }
+regex = { workspace = true }
+maya_common = { workspace = true }

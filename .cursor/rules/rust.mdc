@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ---
 description: This rule provides comprehensive best practices for Rust development, covering code organization, common patterns, performance, security, testing, pitfalls, and tooling. It aims to guide developers in writing idiomatic, efficient, secure, and maintainable Rust code.
@@ -24,20 +24,6 @@ globs: *.rs
 -   Create separate files for each module to improve readability and maintainability.
 -   Use `use` statements to bring items from other modules into scope.
 
-rust
-// lib.rs
-
-pub mod my_module;
-
-mod internal_module; // Not public
-
-
-rust
-// my_module.rs
-
-pub fn my_function() {
-    //...
-}
 
 
 ### 1.3. Component Architecture

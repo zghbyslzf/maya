@@ -3,9 +3,10 @@ name = "clear_lock"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+description = "清理项目中的锁文件"
 
 [dependencies]
-
+maya_common = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.5.0"

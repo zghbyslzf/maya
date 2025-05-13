@@ -1,36 +1,26 @@
-use std::fs::{self, File};
-use std::io::{self, Read, Write};
 use std::path::Path;
-use zip::write::{FileOptions, ZipWriter};
 use ignore::WalkBuilder;
+use maya_common;
 
 pub fn handle_gitignore_pack() {
     // 检查当前目录下是否有.gitignore文件
     let current_dir = std::env::current_dir().unwrap();
-    let gitignore_path = current_dir.join(".gitignore");
     
-    if !gitignore_path.exists() {
+    if let Some(gitignore_path) = maya_common::find_file(&current_dir, ".gitignore") {
+        println!("找到.gitignore文件: {:?}", gitignore_path);
+        
+        // 创建zip文件
+        let result = create_zip_from_gitignore(&current_dir, &current_dir);
+        match result {
+            Ok(zip_path) => println!("成功打包文件到: {:?}", zip_path),
+            Err(e) => println!("打包文件时出错: {}", e),
+        }
+    } else {
         println!("没有找到.gitignore文件");
-        return;
-    }
-    
-    println!("找到.gitignore文件: {:?}", gitignore_path);
-    
-    // 创建zip文件名，用当前目录名
-    let folder_name = current_dir.file_name().unwrap_or_default().to_str().unwrap();
-    let zip_name = format!("{}.zip", folder_name);
-    let zip_path = current_dir.join(&zip_name);
-    
-    match create_zip_from_gitignore(&current_dir, &zip_path) {
-        Ok(_) => println!("成功打包文件到: {}", zip_name),
-        Err(e) => println!("打包文件时出错: {}", e),
     }
 }
 
-fn create_zip_from_gitignore(source_dir: &Path, zip_path: &Path) -> io::Result<()> {
-    let file = File::create(zip_path)?;
-    let mut zip = ZipWriter::new(file);
-    
+fn create_zip_from_gitignore(source_dir: &Path, dest_path: &Path) -> std::io::Result<std::path::PathBuf> {
     // 使用ignore库来尊重.gitignore规则
     let walker = WalkBuilder::new(source_dir)
         .hidden(false) // 不跳过隐藏文件，让.gitignore规则处理
@@ -39,49 +29,32 @@ fn create_zip_from_gitignore(source_dir: &Path, zip_path: &Path) -> io::Result<(
         .require_git(false) // 不需要Git仓库
         .build();
     
-    let options: FileOptions<'_, ()> = FileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
-    
-    // 避免将生成的zip文件本身包含在新的zip中
-    let zip_filename = zip_path.file_name().unwrap_or_default().to_str().unwrap();
+    // 收集忽略规则允许的文件
+    let mut allowed_files = vec![];
     
     for entry in walker {
-        match entry {
-            Ok(entry) => {
-                let path = entry.path();
-                
-                // 跳过.git目录
-                if path.to_str().unwrap_or("").contains("/.git/") || 
-                   path.to_str().unwrap_or("").starts_with(".git/") {
-                    continue;
-                }
-                
-                // 跳过zip文件本身
-                if path.file_name().unwrap_or_default().to_str().unwrap_or("") == zip_filename {
-                    continue;
-                }
-                
-                let metadata = fs::metadata(path)?;
-                
-                // 只处理文件，不处理目录
-                if metadata.is_file() {
-                    let relative_path = path.strip_prefix(source_dir).unwrap();
-                    let name = relative_path.to_str().unwrap_or("");
-                    
-                    // 将文件添加到zip中
-                    zip.start_file(name, options)?;
-                    let mut file = File::open(path)?;
-                    let mut buffer = Vec::new();
-                    file.read_to_end(&mut buffer)?;
-                    zip.write_all(&buffer)?;
-                }
-            },
-            Err(e) => {
-                println!("遍历文件时出错: {}", e);
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            
+            // 跳过.git目录
+            if path.to_str().unwrap_or("").contains("/.git/") || 
+               path.to_str().unwrap_or("").starts_with(".git/") {
+                continue;
             }
+            
+            allowed_files.push(path.to_path_buf());
         }
     }
     
-    zip.finish()?;
-    Ok(())
+    // 创建zip文件 - 使用maya_common中的函数
+    let zip_path = maya_common::create_zip_archive(
+        source_dir, 
+        dest_path,
+        |path| {
+            // 只包含在allowed_files中的文件
+            path.is_file() && allowed_files.iter().any(|p| p == path)
+        }
+    )?;
+    
+    Ok(zip_path)
 }

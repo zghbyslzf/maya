@@ -1,10 +1,7 @@
 use std::fs;
-// use std::io::Write;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
-use zip::write::FileOptions;
-use zip::ZipWriter;
 
+/// Vite打包模块，负责查找Vite配置并将输出目录打包为zip
 pub fn handle_vite_pack() {
     // 检查vite配置文件
     let vite_config = find_vite_config();
@@ -32,22 +29,24 @@ pub fn handle_vite_pack() {
     }
 }
 
+/// 查找Vite配置文件
 fn find_vite_config() -> Option<PathBuf> {
     let current_dir = std::env::current_dir().ok()?;
     println!("当前目录: {:?}", current_dir);
-    let js_config = current_dir.join("vite.config.js");
-    let ts_config = current_dir.join("vite.config.ts");
-    println!("检查js配置路径: {:?}", js_config);
-    println!("检查js配置路径2: {:?}", js_config.exists());
-    if js_config.exists() {
+    
+    // 使用共享库的find_file函数
+    if let Some(js_config) = maya_common::find_file(&current_dir, "vite.config.js") {
+        println!("找到vite.config.js: {:?}", js_config);
         Some(js_config)
-    } else if ts_config.exists() {
+    } else if let Some(ts_config) = maya_common::find_file(&current_dir, "vite.config.ts") {
+        println!("找到vite.config.ts: {:?}", ts_config);
         Some(ts_config)
     } else {
         None
     }
 }
 
+/// 从Vite配置文件中获取输出目录
 fn get_out_dir(config_path: &Path) -> Option<String> {
     let content = fs::read_to_string(config_path).ok()?;
 
@@ -89,34 +88,15 @@ fn get_out_dir(config_path: &Path) -> Option<String> {
     None
 }
 
-fn create_zip(source_dir: &Path, dest_path: &Path) -> std::io::Result<()> {
-    let folder_name = source_dir.file_name().unwrap_or_default().to_str().unwrap();
-    let zip_path = dest_path.join(format!("{}.zip", folder_name));
-    let file = fs::File::create(&zip_path)?;
-    let mut zip = ZipWriter::new(file);
-
-    // 在新版zip中，需要明确指定FileOptions的类型参数为()
-    let options: FileOptions<'_, ()> = FileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
-
-    let walkdir = WalkDir::new(source_dir);
-    let it = walkdir.into_iter().filter_map(|e| e.ok());
-
-    for entry in it {
-        let path = entry.path();
-        let name = path.strip_prefix(source_dir).unwrap();
-
-        if path.is_file() {
-            // 确保文件名是有效的Unicode
-            if let Some(name_str) = name.to_str() {
-                zip.start_file(name_str, options)?;
-                let mut f = fs::File::open(path)?;
-                std::io::copy(&mut f, &mut zip)?;
-            }
-        }
-    }
-
-    zip.finish()?;
+/// 创建ZIP文件
+fn create_zip(source_dir: &Path, dest_path: &Path) -> std::io::Result<PathBuf> {
+    // 使用共享库的create_zip_archive函数
+    let zip_path = maya_common::create_zip_archive(
+        source_dir,
+        dest_path,
+        |path| path.is_file() // 包含所有文件
+    )?;
+    
     println!("成功打包到: {:?}", zip_path);
-    Ok(())
-}
+    Ok(zip_path)
+} 

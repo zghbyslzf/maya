@@ -3,3 +3,7 @@ name = "git_add_commit_push"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+description = "执行Git add, commit和push操作"
+
+[dependencies]
+maya_common = { workspace = true } 
