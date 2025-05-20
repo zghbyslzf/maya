@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-oxipng = "8.0.0"
-walkdir = "2.3.3"
-image = "0.24.6"
-anyhow = "1.0.75"
+oxipng = "9.1.5"
+walkdir = { workspace = true }
+image = "0.25.6"
+anyhow = "1.0.98"
 maya_common = { path = "../maya_common" }
