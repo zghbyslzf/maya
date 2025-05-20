@@ -19,7 +19,11 @@ license    = "MIT"
 opt-level = 0
 
 [profile.release]
-opt-level = 3
+opt-level = 'z'   # Optimize for size.
+lto = true          # Enable Link Time Optimization.
+codegen-units = 1   # Maximize optimizations opportunities.
+panic = 'abort'     # Abort on panic.
+strip = true        # Strip symbols from binary (requires cargo 1.59+).
 
 [workspace.dependencies]
 clear_node_modules = { version = "0.1.0", path = "crates/clear_node_modules" }
@@ -48,6 +52,7 @@ vite_pack_add_zip = { workspace = true }
 gitignore_add_zip = { workspace = true }
 maya_common = { workspace = true }
 compress_pictures = { workspace = true }
+
 
 
 
