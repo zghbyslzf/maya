@@ -6,7 +6,7 @@ resolver = "2"
 
 [package]
 name = "maya"
-version = "0.1.49"
+version = "0.1.50"
 edition = "2021"
 
 [workspace.package]
@@ -52,6 +52,7 @@ vite_pack_add_zip = { workspace = true }
 gitignore_add_zip = { workspace = true }
 maya_common = { workspace = true }
 compress_pictures = { workspace = true }
+
 
 
 
