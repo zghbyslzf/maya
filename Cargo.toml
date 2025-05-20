@@ -28,6 +28,7 @@ git_add_commit_push = { version = "0.1.0", path = "crates/git_add_commit_push" }
 vite_pack_add_zip = { version = "0.1.0", path = "crates/vite_pack_add_zip" }
 gitignore_add_zip = { version = "0.1.0", path = "crates/gitignore_add_zip" }
 maya_common = { version = "0.1.0", path = "crates/maya_common" }
+compress_pictures = { version = "0.1.0", path = "crates/compress_pictures" }
 maya = { version = "0.1.0", path = "src" }
 
 # 共享依赖，可以被多个crate使用
@@ -46,6 +47,7 @@ git_add_commit_push = { workspace = true }
 vite_pack_add_zip = { workspace = true }
 gitignore_add_zip = { workspace = true }
 maya_common = { workspace = true }
+compress_pictures = { workspace = true }
 
 
 

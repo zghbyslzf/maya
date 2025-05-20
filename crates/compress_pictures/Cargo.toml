@@ -1,0 +1,11 @@
+[package]
+name = "compress_pictures"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+oxipng = "8.0.0"
+walkdir = "2.3.3"
+image = "0.24.6"
+anyhow = "1.0.75"
+maya_common = { path = "../maya_common" }
