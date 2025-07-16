@@ -7,6 +7,7 @@ mod modules {
     pub mod git_ops;
     pub mod pack_ops;
     pub mod optimize_ops;
+    pub mod transform_ops;
 }
 
 #[derive(Parser)]
@@ -31,9 +32,14 @@ struct Cli {
     /// 图片压缩操作 (png/jpg/jpeg/all, 添加n参数创建新文件)
     #[arg(short = 'o', long, num_args = 1.., value_name = "OPT_TYPES")]
     optimize_types: Option<Vec<String>>,
+
+    /// 视频转换操作 (源格式 目标格式，例如: mp4 m3u8)
+    #[arg(short = 't', long, num_args = 2.., value_name = "TRANSFORM_TYPES")]
+    transform_types: Option<Vec<String>>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     if let Some(types) = &cli.clean_types {
@@ -44,7 +50,9 @@ fn main() {
         modules::pack_ops::handle_pack_ops(pack_type);
     } else if let Some(opt_types) = &cli.optimize_types {
         modules::optimize_ops::handle_optimize_ops(opt_types, &cli.path);
+    } else if let Some(transform_types) = &cli.transform_types {
+        modules::transform_ops::handle_transform_ops(transform_types, &cli.path).await;
     } else {
-        eprintln!("请使用 -c, -g, -p 或 -o 选项指定操作类型");
+        eprintln!("请使用 -c, -g, -p, -o 或 -t 选项指定操作类型");
     }
 }

@@ -33,6 +33,7 @@ vite_pack_add_zip = { version = "0.1.0", path = "crates/vite_pack_add_zip" }
 gitignore_add_zip = { version = "0.1.0", path = "crates/gitignore_add_zip" }
 maya_common = { version = "0.1.0", path = "crates/maya_common" }
 compress_pictures = { version = "0.1.0", path = "crates/compress_pictures" }
+mp4_to_m3u8 = { version = "0.1.0", path = "crates/mp4_to_m3u8" }
 maya = { version = "0.1.0", path = "src" }
 
 # 共享依赖，可以被多个crate使用
@@ -42,6 +43,7 @@ zip = "2.6.1"
 regex = "1.10.3"
 ignore = "0.4.22"
 serde_json = "1.0"
+tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros"] }
 
 [dependencies]
 clap = { workspace = true }
@@ -52,6 +54,8 @@ vite_pack_add_zip = { workspace = true }
 gitignore_add_zip = { workspace = true }
 maya_common = { workspace = true }
 compress_pictures = { workspace = true }
+mp4_to_m3u8 = { workspace = true }
+tokio = { workspace = true }
 
 
 
