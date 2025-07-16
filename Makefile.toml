@@ -26,7 +26,7 @@ dependencies = ["pkg"]
 command = "powershell"
 args = [
   "-Command",
-  "if (Test-Path pkg/release) { Remove-Item -Recurse -Force pkg/release }; New-Item -ItemType Directory -Force -Path pkg/release; if (Test-Path target/release/maya.exe) { Copy-Item target/release/maya.exe pkg/release/ } else { Write-Error \"maya.exe not found in target/release\" }"
+  "if (Test-Path pkg/release) { Remove-Item -Recurse -Force pkg/release }; New-Item -ItemType Directory -Force -Path pkg/release;  if (Test-Path target/release/maya.exe) { Copy-Item target/release/maya.exe pkg/release/; Write-Host '✅ 已复制 maya.exe' } else { Write-Error 'maya.exe not found in target/release' }; if (Test-Path FFmpeg/ffmpeg.exe) { Copy-Item FFmpeg/ffmpeg.exe pkg/release/; Write-Host '✅ 已复制 FFmpeg'} else {Write-Error 'FFmpeg.exe not found in target/release'}; if (Test-Path FFmpeg/ffprobe.exe) { Copy-Item FFmpeg/ffprobe.exe pkg/release/; Write-Host '✅ 已复制 ffprobe'}else { Write-Error 'ffprobe.exe not found in target/release' };"
 ]
 workspace = false
 cwd = "."
