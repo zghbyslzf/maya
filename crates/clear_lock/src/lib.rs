@@ -33,11 +33,7 @@ fn clear_lock_files_in_dir(dir: &Path, lock_files: &[&str], count: &mut usize) -
         let entry = entry?;
         let path = entry.path();
 
-        if path.is_dir()
-            && path
-                .file_name()
-                .map_or(false, |name| name != "node_modules")
-        {
+        if path.is_dir() && path.file_name().is_some_and(|name| name != "node_modules") {
             // 跳过 node_modules 目录，避免不必要的递归
             clear_lock_files_in_dir(&path, lock_files, count)?;
         }

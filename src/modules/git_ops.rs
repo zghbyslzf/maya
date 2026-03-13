@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 /// 处理Git操作的模块
-pub fn handle_git_ops(git_ops: &[String], path: &PathBuf) {
+pub fn handle_git_ops(git_ops: &[String], path: &Path) {
     if git_ops.len() == 1 && (git_ops[0] == "m" || git_ops[0] == "M") {
         match git_add_commit_push::git_add_commit_push(path.to_string_lossy().to_string()) {
             Ok(_) => println!("已完成 git add/commit/push 操作"),

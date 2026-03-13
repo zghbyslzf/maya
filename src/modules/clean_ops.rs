@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 /// 处理清理操作的模块
-pub fn handle_clean_ops(clean_types: &[String], path: &PathBuf) {
+pub fn handle_clean_ops(clean_types: &[String], path: &Path) {
     for clean_type in clean_types {
         match clean_type.as_str() {
             "n" | "node_modules" => {
