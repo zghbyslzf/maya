@@ -1,5 +1,5 @@
-use anyhow::{anyhow, Result};
 use image::{self};
+use maya_common::error::{Error, Result};
 use oxipng::{optimize_from_memory, Options};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -30,7 +30,7 @@ impl ImageType {
 impl FromStr for ImageType {
     type Err = String;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "png" => Ok(ImageType::Png),
             "jpg" => Ok(ImageType::Jpg),
@@ -140,10 +140,10 @@ fn compress_image(image_path: &Path, create_new_file: bool) -> Result<f64> {
         match ext.as_str() {
             "png" => compress_png(image_path, create_new_file, original_size),
             "jpg" | "jpeg" => compress_jpg(image_path, create_new_file, original_size),
-            _ => Err(anyhow!("不支持的图片格式: {}", ext)),
+            _ => Err(Error::compression(format!("不支持的图片格式: {}", ext))),
         }
     } else {
-        Err(anyhow!("文件没有扩展名"))
+        Err(Error::compression("文件没有扩展名"))
     }
 }
 
@@ -155,7 +155,8 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
     let options = Options::default();
 
     // 优化PNG到内存
-    let output_data_in_memory = optimize_from_memory(&input_data, &options)?;
+    let output_data_in_memory = optimize_from_memory(&input_data, &options)
+        .map_err(|e| Error::compression(format!("PNG优化失败: {}", e)))?;
     let compressed_size_in_memory = output_data_in_memory.len() as f64;
 
     if !create_new_file {
@@ -188,7 +189,8 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
 /// 压缩JPG/JPEG图片
 fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
     // 打开图片
-    let img = image::open(image_path)?;
+    let img =
+        image::open(image_path).map_err(|e| Error::compression(format!("无法打开图片: {}", e)))?;
 
     // 尝试将图片编码到内存缓冲区
     let mut buffer = Vec::new();
@@ -203,7 +205,8 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
 
     // 使用 img.write_to 更简单直接
     let mut cursor = std::io::Cursor::new(&mut buffer);
-    img.write_to(&mut cursor, image::ImageFormat::Jpeg)?; // 使用image crate的默认质量或特定质量
+    img.write_to(&mut cursor, image::ImageFormat::Jpeg)
+        .map_err(|e| Error::compression(format!("图片编码失败: {}", e)))?; // 使用image crate的默认质量或特定质量
     let compressed_size_in_memory = buffer.len() as f64;
 
     if !create_new_file {
@@ -226,7 +229,8 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
         let output_path = create_output_path(image_path, "_c");
         // 可以直接写入内存中的buffer，或者让image库再次保存（可能更保险，确保元数据等正确写入）
         // fs::write(&output_path, buffer)?;
-        img.save_with_format(&output_path, image::ImageFormat::Jpeg)?; // 保持与之前逻辑一致性
+        img.save_with_format(&output_path, image::ImageFormat::Jpeg)
+            .map_err(|e| Error::compression(format!("图片保存失败: {}", e)))?; // 保持与之前逻辑一致性
 
         let final_compressed_size_on_disk = fs::metadata(&output_path)?.len() as f64;
         let compression_ratio = 1.0 - (final_compressed_size_on_disk / original_size);

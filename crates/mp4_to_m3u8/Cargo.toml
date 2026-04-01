@@ -10,3 +10,4 @@ indicatif = "0.17"
 tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros", "time"] }
 ffmpeg-sidecar = "2.0.6"
 regex = "1.10"
+maya_common = { workspace = true, features = ["anyhow", "tokio"] }

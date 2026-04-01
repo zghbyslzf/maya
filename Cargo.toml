@@ -1,4 +1,4 @@
-﻿[workspace]
+[workspace]
 # 指定工作区成员的路径，这里是"./crates/*"，意味着包含crates目录下的所有包。
 members  = ["crates/*"] 
 # 指定使用的依赖解析器版本，这里是"2"
@@ -44,6 +44,8 @@ regex = "1.10.3"
 ignore = "0.4.22"
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros"] }
+anyhow = "1.0"
+thiserror = "1.0"
 
 [dependencies]
 clap = { workspace = true }

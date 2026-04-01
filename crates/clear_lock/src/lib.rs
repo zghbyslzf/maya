@@ -1,9 +1,9 @@
 use std::fs;
-use std::io;
 use std::path::Path;
+use maya_common::error::Result;
 
 /// 清除目录中的锁文件 (package-lock.json, yarn.lock 等)
-pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> io::Result<usize> {
+pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> Result<usize> {
     let lock_files = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
     let mut count = 0;
 
@@ -13,7 +13,7 @@ pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> io::Result<usize> {
     Ok(count)
 }
 
-fn clear_lock_files_in_dir(dir: &Path, lock_files: &[&str], count: &mut usize) -> io::Result<()> {
+fn clear_lock_files_in_dir(dir: &Path, lock_files: &[&str], count: &mut usize) -> Result<()> {
     if !dir.is_dir() {
         return Ok(());
     }

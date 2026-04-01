@@ -1,28 +1,27 @@
 use ignore::WalkBuilder;
 use std::path::Path;
+use maya_common::error::Result;
 
-pub fn handle_gitignore_pack() {
+pub fn handle_gitignore_pack() -> Result<()> {
     // 检查当前目录下是否有.gitignore文件
-    let current_dir = std::env::current_dir().unwrap();
+    let current_dir = std::env::current_dir()?;
 
     if let Some(gitignore_path) = maya_common::find_file(&current_dir, ".gitignore") {
         println!("找到.gitignore文件: {:?}", gitignore_path);
 
         // 创建zip文件
-        let result = create_zip_from_gitignore(&current_dir, &current_dir);
-        match result {
-            Ok(zip_path) => println!("成功打包文件到: {:?}", zip_path),
-            Err(e) => println!("打包文件时出错: {}", e),
-        }
+        let zip_path = create_zip_from_gitignore(&current_dir, &current_dir)?;
+        println!("成功打包文件到: {:?}", zip_path);
     } else {
         println!("没有找到.gitignore文件");
     }
+    Ok(())
 }
 
 fn create_zip_from_gitignore(
     source_dir: &Path,
     dest_path: &Path,
-) -> std::io::Result<std::path::PathBuf> {
+) -> Result<std::path::PathBuf> {
     // 使用ignore库来尊重.gitignore规则
     let walker = WalkBuilder::new(source_dir)
         .hidden(false) // 不跳过隐藏文件，让.gitignore规则处理

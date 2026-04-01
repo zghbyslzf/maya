@@ -8,4 +8,12 @@ description = "共享库，包含Maya CLI工具集的通用功能"
 [dependencies]
 walkdir = { workspace = true }
 zip = { workspace = true }
-regex = { workspace = true } 
+regex = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[features]
+default = []
+anyhow = ["dep:anyhow"]
+tokio = ["dep:tokio"] 

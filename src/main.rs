@@ -1,4 +1,5 @@
-﻿use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand};
+use maya_common::error::Result;
 use std::path::PathBuf;
 
 // 导入自定义模块
@@ -73,24 +74,25 @@ enum Command {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
         Command::Clean { types, path } => {
-            modules::clean_ops::handle_clean_ops(&types, &path);
+            modules::clean_ops::handle_clean_ops(&types, &path)?;
         }
         Command::Git { ops, path } => {
-            modules::git_ops::handle_git_ops(&ops, &path);
+            modules::git_ops::handle_git_ops(&ops, &path)?;
         }
         Command::Pack { pack_type } => {
-            modules::pack_ops::handle_pack_ops(&pack_type);
+            modules::pack_ops::handle_pack_ops(&pack_type)?;
         }
         Command::Optimize { types, path } => {
-            modules::optimize_ops::handle_optimize_ops(&types, &path);
+            modules::optimize_ops::handle_optimize_ops(&types, &path)?;
         }
         Command::Transform { types, path } => {
-            modules::transform_ops::handle_transform_ops(&types, &path).await;
+            modules::transform_ops::handle_transform_ops(&types, &path).await?;
         }
     }
+    Ok(())
 }

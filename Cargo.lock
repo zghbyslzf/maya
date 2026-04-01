@@ -1183,7 +1183,10 @@ dependencies = [
 name = "maya_common"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "regex",
+ "thiserror",
+ "tokio",
  "walkdir",
  "zip",
 ]
@@ -1238,6 +1241,7 @@ dependencies = [
  "anyhow",
  "ffmpeg-sidecar",
  "indicatif",
+ "maya_common",
  "regex",
  "tokio",
  "walkdir",

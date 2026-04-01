@@ -1,8 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use maya_common::error::Result;
 
 /// Vite打包模块，负责查找Vite配置并将输出目录打包为zip
-pub fn handle_vite_pack() {
+pub fn handle_vite_pack() -> Result<()> {
     // 检查vite配置文件
     let vite_config = find_vite_config();
 
@@ -11,22 +12,23 @@ pub fn handle_vite_pack() {
         let out_dir = get_out_dir(&config_path).unwrap_or_else(|| "dist".to_string());
 
         // 检查outDir文件夹是否存在
-        let current_dir = std::env::current_dir().unwrap();
+        let current_dir = std::env::current_dir()?;
         let target_dir = current_dir.join(&out_dir);
         if !target_dir.exists() {
             // 检查dist文件夹是否存在
             let dist_dir = current_dir.join("dist");
             if dist_dir.exists() {
-                create_zip(&dist_dir, &current_dir).unwrap();
+                create_zip(&dist_dir, &current_dir)?;
             } else {
                 println!("没有检测到对应打包文件夹，请检查Vite配置");
             }
         } else {
-            create_zip(&target_dir, &current_dir).unwrap();
+            create_zip(&target_dir, &current_dir)?;
         }
     } else {
         println!("没有检测到vite.config.js或vite.config.ts文件");
     }
+    Ok(())
 }
 
 /// 查找Vite配置文件
@@ -89,7 +91,7 @@ fn get_out_dir(config_path: &Path) -> Option<String> {
 }
 
 /// 创建ZIP文件
-fn create_zip(source_dir: &Path, dest_path: &Path) -> std::io::Result<PathBuf> {
+fn create_zip(source_dir: &Path, dest_path: &Path) -> Result<PathBuf> {
     // 使用共享库的create_zip_archive函数
     let zip_path = maya_common::create_zip_archive(
         source_dir,

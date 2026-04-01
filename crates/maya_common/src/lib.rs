@@ -1,3 +1,6 @@
+pub mod error;
+pub use error::{Error, Result};
+
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -83,7 +86,7 @@ pub fn find_file(dir: &Path, filename: &str) -> Option<PathBuf> {
 
 /// 格式化结果输出
 pub fn format_result<T, E: std::fmt::Display>(
-    result: Result<T, E>, 
+    result: std::result::Result<T, E>, 
     success_msg: &str, 
     error_prefix: &str
 ) -> T
