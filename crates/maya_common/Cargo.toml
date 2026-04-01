@@ -12,8 +12,10 @@ regex = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+rayon = { workspace = true, optional = true }
 
 [features]
 default = []
 anyhow = ["dep:anyhow"]
-tokio = ["dep:tokio"] 
+tokio = ["dep:tokio"]
+parallel = ["dep:rayon"] 

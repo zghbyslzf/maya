@@ -1,45 +1,36 @@
 use std::fs;
 use std::path::Path;
 use maya_common::error::Result;
+use maya_common::file_utils::find_files;
 
 /// 清除目录中的锁文件 (package-lock.json, yarn.lock 等)
 pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> Result<usize> {
     let lock_files = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
-    let mut count = 0;
+    let lock_files_set: std::collections::HashSet<&str> = lock_files.iter().copied().collect();
 
-    // 遍历目录
-    clear_lock_files_in_dir(dir.as_ref(), &lock_files, &mut count)?;
+    // 使用共享的文件遍历函数查找所有文件
+    let all_files = find_files(dir.as_ref(), |path| {
+        // 只检查文件
+        if !path.is_file() {
+            return false;
+        }
+        
+        // 获取文件名
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            lock_files_set.contains(file_name)
+        } else {
+            false
+        }
+    })?;
+
+    let mut count = 0;
+    for file_path in all_files {
+        fs::remove_file(&file_path)?;
+        count += 1;
+        println!("已删除: {}", file_path.display());
+    }
 
     Ok(count)
-}
-
-fn clear_lock_files_in_dir(dir: &Path, lock_files: &[&str], count: &mut usize) -> Result<()> {
-    if !dir.is_dir() {
-        return Ok(());
-    }
-
-    // 检查当前目录中的锁文件
-    for &lock_file in lock_files {
-        let file_path = dir.join(lock_file);
-        if file_path.exists() {
-            fs::remove_file(&file_path)?;
-            *count += 1;
-            println!("已删除: {}", file_path.display());
-        }
-    }
-
-    // 遍历子目录
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        if path.is_dir() && path.file_name().is_some_and(|name| name != "node_modules") {
-            // 跳过 node_modules 目录，避免不必要的递归
-            clear_lock_files_in_dir(&path, lock_files, count)?;
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

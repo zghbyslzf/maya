@@ -1,10 +1,10 @@
 use image::{self};
 use maya_common::error::{Error, Result};
+use maya_common::file_utils::find_files_by_extension;
 use oxipng::{optimize_from_memory, Options};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use walkdir::WalkDir;
 
 /// 压缩图片类型枚举
 #[derive(Debug, PartialEq)]
@@ -13,18 +13,6 @@ pub enum ImageType {
     Jpg,
     Jpeg,
     All,
-}
-
-impl ImageType {
-    fn is_supported_extension(&self, ext: &str) -> bool {
-        let ext = ext.to_lowercase();
-        match self {
-            ImageType::Png => ext == "png",
-            ImageType::Jpg => ext == "jpg",
-            ImageType::Jpeg => ext == "jpeg",
-            ImageType::All => ext == "png" || ext == "jpg" || ext == "jpeg",
-        }
-    }
 }
 
 impl FromStr for ImageType {
@@ -70,31 +58,32 @@ pub fn compress_images(
     let mut total_compression_ratio_sum = 0.0;
     let mut processed_files_count = 0; // 用于计算平均压缩率的分母
 
-    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-        let file_path = entry.path();
+    // 根据图片类型获取扩展名列表
+    let extensions: Vec<&str> = match img_type {
+        ImageType::Png => vec!["png"],
+        ImageType::Jpg => vec!["jpg"],
+        ImageType::Jpeg => vec!["jpeg"],
+        ImageType::All => vec!["png", "jpg", "jpeg"],
+    };
 
-        if file_path.is_file() {
-            if let Some(extension) = file_path.extension() {
-                let ext_str = extension.to_string_lossy().to_string();
+    // 使用共享的文件遍历函数查找匹配的图片文件
+    let image_files = find_files_by_extension(path, &extensions)?;
 
-                if img_type.is_supported_extension(&ext_str) {
-                    processed_files_count += 1; // 标记为已处理，无论成功与否
-                    match compress_image(file_path, create_new_file) {
-                        Ok(ratio) => {
-                            successful_compressions += 1;
-                            total_compression_ratio_sum += ratio;
-                            println!(
-                                "成功压缩: {} (压缩率: {:.2}%)",
-                                file_path.display(),
-                                ratio * 100.0
-                            );
-                        }
-                        Err(e) => {
-                            failed_compressions += 1;
-                            eprintln!("压缩失败 {}: {}", file_path.display(), e);
-                        }
-                    }
-                }
+    for file_path in image_files {
+        processed_files_count += 1; // 标记为已处理，无论成功与否
+        match compress_image(&file_path, create_new_file) {
+            Ok(ratio) => {
+                successful_compressions += 1;
+                total_compression_ratio_sum += ratio;
+                println!(
+                    "成功压缩: {} (压缩率: {:.2}%)",
+                    file_path.display(),
+                    ratio * 100.0
+                );
+            }
+            Err(e) => {
+                failed_compressions += 1;
+                eprintln!("压缩失败 {}: {}", file_path.display(), e);
             }
         }
     }
