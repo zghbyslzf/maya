@@ -279,3 +279,39 @@ fn parse_time_string(time_str: &str) -> Result<f64> {
         )))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_time_string_valid() {
+        assert_eq!(parse_time_string("00:00:00").unwrap(), 0.0);
+        assert_eq!(parse_time_string("00:00:01").unwrap(), 1.0);
+        assert_eq!(parse_time_string("00:01:00").unwrap(), 60.0);
+        assert_eq!(parse_time_string("01:00:00").unwrap(), 3600.0);
+        assert_eq!(parse_time_string("01:30:45").unwrap(), 5445.0);
+        assert_eq!(parse_time_string("01:30:45.5").unwrap(), 5445.5);
+    }
+
+    #[test]
+    fn test_parse_time_string_invalid() {
+        assert!(parse_time_string("").is_err());
+        assert!(parse_time_string("00:00").is_err());
+        assert!(parse_time_string("00:00:00:00").is_err());
+        // 非数字部分会解析为0.0，所以以下字符串会返回0.0而不是错误
+        assert_eq!(parse_time_string("abc:def:ghi").unwrap(), 0.0);
+        assert_eq!(parse_time_string("xx:yy:zz").unwrap(), 0.0);
+        // "00:00:60" 是有效的（60秒），解析为60.0
+        assert_eq!(parse_time_string("00:00:60").unwrap(), 60.0);
+    }
+
+    #[test]
+    fn test_parse_time_string_edge_cases() {
+        // 空部分使用默认值0.0
+        assert_eq!(parse_time_string("::").unwrap(), 0.0);
+        assert_eq!(parse_time_string("01::").unwrap(), 3600.0);
+        assert_eq!(parse_time_string(":02:").unwrap(), 120.0);
+        assert_eq!(parse_time_string("::03").unwrap(), 3.0);
+    }
+}

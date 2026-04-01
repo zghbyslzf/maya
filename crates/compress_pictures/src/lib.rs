@@ -359,3 +359,86 @@ fn create_output_path(input_path: &Path, suffix: &str) -> PathBuf {
 
     input_path.with_file_name(new_filename)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_image_type_from_str_valid() {
+        assert_eq!(ImageType::from_str("png").unwrap(), ImageType::Png);
+        assert_eq!(ImageType::from_str("PNG").unwrap(), ImageType::Png);
+        assert_eq!(ImageType::from_str("jpg").unwrap(), ImageType::Jpg);
+        assert_eq!(ImageType::from_str("JPG").unwrap(), ImageType::Jpg);
+        assert_eq!(ImageType::from_str("jpeg").unwrap(), ImageType::Jpeg);
+        assert_eq!(ImageType::from_str("JPEG").unwrap(), ImageType::Jpeg);
+        assert_eq!(ImageType::from_str("all").unwrap(), ImageType::All);
+        assert_eq!(ImageType::from_str("ALL").unwrap(), ImageType::All);
+    }
+
+    #[test]
+    fn test_image_type_from_str_invalid() {
+        assert!(ImageType::from_str("gif").is_err());
+        assert!(ImageType::from_str("bmp").is_err());
+        assert!(ImageType::from_str("").is_err());
+        assert!(ImageType::from_str("png ").is_err());
+    }
+
+    #[test]
+    fn test_image_type_partial_eq() {
+        assert_eq!(ImageType::Png, ImageType::Png);
+        assert_ne!(ImageType::Png, ImageType::Jpg);
+        assert_ne!(ImageType::Jpg, ImageType::Jpeg);
+    }
+
+    #[test]
+    fn test_compress_image_unsupported_extension() {
+        use std::fs::File;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.bmp");
+        File::create(&file_path).unwrap();
+
+        let result = compress_image(&file_path, false);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("不支持的图片格式"));
+    }
+
+    #[test]
+    fn test_compress_image_file_not_found() {
+        let non_existent_path = std::path::Path::new("/non/existent/file.png");
+        let result = compress_image(non_existent_path, false);
+        assert!(result.is_err());
+        // 应该是Io错误，但我们的错误类型会包装它
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("I/O错误"));
+    }
+
+    #[test]
+    fn test_compress_image_png_create_new() {
+        use image::{ImageBuffer, Rgba};
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.png");
+
+        // 创建一个1x1像素的PNG图像
+        let img: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
+        img.save(&file_path).unwrap();
+
+        // 使用create_new_file=true进行压缩，这样不会修改原文件
+        let result = compress_image(&file_path, true);
+        // 压缩应该成功，但可能没有压缩率（因为图像很小）
+        assert!(result.is_ok());
+        let compression_ratio = result.unwrap();
+        // 压缩率应该在0.0到1.0之间（可能是0.0，因为图像太小无法压缩）
+        assert!(compression_ratio >= 0.0 && compression_ratio <= 1.0);
+
+        // 检查新文件是否被创建（带有_c后缀）
+        let new_file_path = temp_dir.path().join("test_c.png");
+        assert!(new_file_path.exists());
+    }
+}

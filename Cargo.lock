@@ -401,6 +401,7 @@ dependencies = [
  "maya_common",
  "oxipng",
  "rayon",
+ "tempfile",
  "walkdir",
 ]
 
