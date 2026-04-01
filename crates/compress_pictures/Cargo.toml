@@ -8,4 +8,5 @@ oxipng = "9.1.5"
 walkdir = { workspace = true }
 image = "0.25.6"
 anyhow = "1.0.98"
-maya_common = { path = "../maya_common" }
+maya_common = { path = "../maya_common", features = ["parallel"] }
+rayon = { workspace = true }

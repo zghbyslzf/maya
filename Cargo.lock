@@ -400,6 +400,7 @@ dependencies = [
  "image",
  "maya_common",
  "oxipng",
+ "rayon",
  "walkdir",
 ]
 

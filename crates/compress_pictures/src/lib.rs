@@ -2,6 +2,7 @@ use image::{self};
 use maya_common::error::{Error, Result};
 use maya_common::file_utils::find_files_by_extension;
 use oxipng::{optimize_from_memory, Options};
+use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -100,6 +101,104 @@ pub fn compress_images(
 --- 压缩总结 ---"
     );
     println!("总共处理图片数量: {}", processed_files_count);
+    println!("成功压缩文件数量: {}", successful_compressions);
+    println!("失败压缩文件数量: {}", failed_compressions);
+    if successful_compressions > 0 {
+        println!(
+            "成功文件的平均压缩率: {:.2}%",
+            avg_compression_ratio * 100.0
+        );
+    } else {
+        println!("没有文件被成功压缩。");
+    }
+    println!("--------------------");
+
+    Ok((
+        successful_compressions,
+        failed_compressions,
+        avg_compression_ratio,
+    ))
+}
+
+/// 并行压缩图片函数
+///
+/// # 参数
+/// * `path` - 目录路径
+/// * `img_type` - 图片类型
+/// * `create_new_file` - 是否创建新文件（添加_c后缀）而不是覆盖原文件
+///
+/// # 返回
+/// * `Result<(u32, u32, f64)>` - (成功压缩的文件数量, 失败的文件数量, 平均压缩率)
+pub fn compress_images_parallel(
+    path: &Path,
+    img_type: ImageType,
+    create_new_file: bool,
+) -> Result<(u32, u32, f64)> {
+    println!(
+        "开始并行压缩 {} 图片...",
+        match img_type {
+            ImageType::Png => "PNG",
+            ImageType::Jpg => "JPG",
+            ImageType::Jpeg => "JPEG",
+            ImageType::All => "所有支持的",
+        }
+    );
+
+    // 根据图片类型获取扩展名列表
+    let extensions: Vec<&str> = match img_type {
+        ImageType::Png => vec!["png"],
+        ImageType::Jpg => vec!["jpg"],
+        ImageType::Jpeg => vec!["jpeg"],
+        ImageType::All => vec!["png", "jpg", "jpeg"],
+    };
+
+    // 使用共享的文件遍历函数查找匹配的图片文件
+    let image_files = find_files_by_extension(path, &extensions)?;
+
+    // 并行处理每个文件
+    let results: Vec<(PathBuf, Result<f64>)> = image_files
+        .par_iter()
+        .map(|file_path| {
+            let result = compress_image(file_path, create_new_file);
+            (file_path.clone(), result)
+        })
+        .collect();
+
+    let mut successful_compressions = 0;
+    let mut failed_compressions = 0;
+    let mut total_compression_ratio_sum = 0.0;
+
+    // 处理结果并输出信息
+    for (file_path, result) in results.iter() {
+        match result {
+            Ok(ratio) => {
+                successful_compressions += 1;
+                total_compression_ratio_sum += *ratio;
+                println!(
+                    "成功压缩: {} (压缩率: {:.2}%)",
+                    file_path.display(),
+                    *ratio * 100.0
+                );
+            }
+            Err(e) => {
+                failed_compressions += 1;
+                eprintln!("压缩失败 {}: {}", file_path.display(), e);
+            }
+        }
+    }
+
+    let avg_compression_ratio = if successful_compressions > 0 {
+        // 平均压缩率只基于成功压缩的文件
+        total_compression_ratio_sum / successful_compressions as f64
+    } else {
+        0.0
+    };
+
+    println!(
+        "
+--- 压缩总结 ---"
+    );
+    println!("总共处理图片数量: {}", results.len());
     println!("成功压缩文件数量: {}", successful_compressions);
     println!("失败压缩文件数量: {}", failed_compressions);
     if successful_compressions > 0 {

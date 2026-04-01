@@ -1,6 +1,9 @@
 use compress_pictures;
-use std::path::Path; // 需要从 crate 根引用 compress_pictures
 use maya_common::error::{Error, Result};
+use maya_common::file_utils::find_files_by_extension;
+use std::path::Path;
+
+const PARALLEL_THRESHOLD: usize = 10;
 
 pub fn handle_optimize_ops(types: &[String], path: &Path) -> Result<()> {
     if types.is_empty() {
@@ -19,9 +22,26 @@ pub fn handle_optimize_ops(types: &[String], path: &Path) -> Result<()> {
 
     let img_type = img_type_str.parse::<compress_pictures::ImageType>()
         .map_err(|e| Error::invalid_argument(format!("图片类型参数 '{}' 错误: {}", img_type_str, e)))?;
-    
-    let (successful_compressions, failed_compressions, _avg_compression_ratio) = 
-        compress_pictures::compress_images(path, img_type, create_new_file)?;
+
+    // 根据图片类型获取扩展名列表
+    let extensions: Vec<&str> = match img_type {
+        compress_pictures::ImageType::Png => vec!["png"],
+        compress_pictures::ImageType::Jpg => vec!["jpg"],
+        compress_pictures::ImageType::Jpeg => vec!["jpeg"],
+        compress_pictures::ImageType::All => vec!["png", "jpg", "jpeg"],
+    };
+
+    // 获取文件列表以决定是否使用并行处理
+    let image_files = find_files_by_extension(path, &extensions)?;
+    let file_count = image_files.len();
+
+    let (successful_compressions, failed_compressions, _avg_compression_ratio) = if file_count >= PARALLEL_THRESHOLD {
+        println!("检测到 {} 个文件，启用并行压缩...", file_count);
+        compress_pictures::compress_images_parallel(path, img_type, create_new_file)?
+    } else {
+        println!("检测到 {} 个文件，使用串行压缩...", file_count);
+        compress_pictures::compress_images(path, img_type, create_new_file)?
+    };
     
     if successful_compressions == 0 && failed_compressions == 0 {
         println!("未找到符合指定类型的图片进行处理。");
