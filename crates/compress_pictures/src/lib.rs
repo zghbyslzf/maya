@@ -4,9 +4,11 @@ use maya_common::file_utils::find_files_by_extension;
 use oxipng::{optimize_from_memory, Options};
 use rayon::prelude::*;
 use std::fs;
+use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+const STREAMING_THRESHOLD: u64 = 10 * 1024 * 1024; // 10 MB
 /// 压缩图片类型枚举
 #[derive(Debug, PartialEq)]
 pub enum ImageType {
@@ -237,7 +239,15 @@ fn compress_image(image_path: &Path, create_new_file: bool) -> Result<f64> {
 
 /// 压缩PNG图片
 fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
-    let input_data = fs::read(image_path)?;
+    if original_size as u64 > STREAMING_THRESHOLD {
+        println!("文件大小超过阈值，使用缓冲IO处理: {}", image_path.display());
+    }
+    // 使用 BufReader 读取文件
+    let file = fs::File::open(image_path)?;
+    let mut reader = BufReader::new(file);
+    let mut input_data = Vec::new();
+    use std::io::Read;
+    reader.read_to_end(&mut input_data)?;
 
     // 使用默认优化选项
     let options = Options::default();
@@ -258,14 +268,22 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
             );
             return Ok(0.0); // 返回0%压缩率，表示未进行有效压缩
         }
-        // 体积变小，执行覆写
-        fs::write(image_path, output_data_in_memory)?;
+        // 体积变小，执行覆写，使用 BufWriter
+        let file = fs::File::create(image_path)?;
+        let mut writer = BufWriter::new(file);
+        use std::io::Write;
+        writer.write_all(&output_data_in_memory)?;
+        writer.flush()?;
         let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
         Ok(compression_ratio)
     } else {
         // 创建新文件模式
         let output_path = create_output_path(image_path, "_c");
-        fs::write(&output_path, output_data_in_memory)?;
+        let file = fs::File::create(&output_path)?;
+        let mut writer = BufWriter::new(file);
+        use std::io::Write;
+        writer.write_all(&output_data_in_memory)?;
+        writer.flush()?;
 
         // 对于新文件，我们仍然基于其在磁盘上的最终大小计算压缩率
         let final_compressed_size_on_disk = fs::metadata(&output_path)?.len() as f64;
@@ -276,25 +294,20 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
 
 /// 压缩JPG/JPEG图片
 fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
-    // 打开图片
-    let img =
-        image::open(image_path).map_err(|e| Error::compression(format!("无法打开图片: {}", e)))?;
+    if original_size as u64 > STREAMING_THRESHOLD {
+        println!("文件大小超过阈值，使用缓冲IO处理: {}", image_path.display());
+    }
+    // 使用 BufReader 打开图片
+    let file = fs::File::open(image_path)?;
+    let reader = BufReader::new(file);
+    let img = image::load(reader, image::ImageFormat::Jpeg)
+        .map_err(|e| Error::compression(format!("无法打开图片: {}", e)))?;
 
     // 尝试将图片编码到内存缓冲区
     let mut buffer = Vec::new();
-    // // 使用 image::ImageEncoder::write_image 进行更通用的编码
-    // // 需要选择一个 Encoder, 对于 Jpeg， image::codecs::jpeg::JpegEncoder 适用
-    // let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buffer, 85); // 假设质量为85
-
-    // 获取图像的原始数据和尺寸
-    // 注意：image crate 的 `img.save_with_format` 或 `img.write_to` 对于Jpeg是简便方法。
-    // 为了获取到内存中的字节流，我们需要使用更底层的 `ImageEncoder` API
-    // 或者使用 `img.write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Jpeg)`
-
-    // 使用 img.write_to 更简单直接
     let mut cursor = std::io::Cursor::new(&mut buffer);
     img.write_to(&mut cursor, image::ImageFormat::Jpeg)
-        .map_err(|e| Error::compression(format!("图片编码失败: {}", e)))?; // 使用image crate的默认质量或特定质量
+        .map_err(|e| Error::compression(format!("图片编码失败: {}", e)))?;
     let compressed_size_in_memory = buffer.len() as f64;
 
     if !create_new_file {
@@ -308,17 +321,23 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
             );
             return Ok(0.0); // 返回0%压缩率
         }
-        // 体积变小，执行覆写
-        fs::write(image_path, buffer)?;
+        // 体积变小，执行覆写，使用 BufWriter
+        let file = fs::File::create(image_path)?;
+        let mut writer = BufWriter::new(file);
+        use std::io::Write;
+        writer.write_all(&buffer)?;
+        writer.flush()?;
         let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
         Ok(compression_ratio)
     } else {
         // 创建新文件模式
         let output_path = create_output_path(image_path, "_c");
-        // 可以直接写入内存中的buffer，或者让image库再次保存（可能更保险，确保元数据等正确写入）
-        // fs::write(&output_path, buffer)?;
-        img.save_with_format(&output_path, image::ImageFormat::Jpeg)
-            .map_err(|e| Error::compression(format!("图片保存失败: {}", e)))?; // 保持与之前逻辑一致性
+        let file = fs::File::create(&output_path)?;
+        let mut writer = BufWriter::new(file);
+        use std::io::Write;
+        img.write_to(&mut writer, image::ImageFormat::Jpeg)
+            .map_err(|e| Error::compression(format!("图片保存失败: {}", e)))?;
+        writer.flush()?;
 
         let final_compressed_size_on_disk = fs::metadata(&output_path)?.len() as f64;
         let compression_ratio = 1.0 - (final_compressed_size_on_disk / original_size);
