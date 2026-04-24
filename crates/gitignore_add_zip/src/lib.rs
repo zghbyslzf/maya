@@ -36,10 +36,7 @@ fn create_zip_from_gitignore(
     for entry in walker.flatten() {
         let path = entry.path();
 
-        // 跳过.git目录
-        if path.to_str().unwrap_or("").contains("/.git/")
-            || path.to_str().unwrap_or("").starts_with(".git/")
-        {
+        if path.components().any(|c| c == std::path::Component::Normal(".git".as_ref())) {
             continue;
         }
 

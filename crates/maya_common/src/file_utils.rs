@@ -1,6 +1,9 @@
 use crate::error::{Error, Result};
+use std::fs;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use zip::write::{FileOptions, ZipWriter};
 #[cfg(feature = "parallel")]
 use walkdir::DirEntry;
 
@@ -166,10 +169,8 @@ fn remove_empty_dirs_recursive(dir: &Path, count: &mut usize) -> Result<()> {
         let path = entry.path();
 
         if path.is_dir() {
-            // 递归处理子目录
             remove_empty_dirs_recursive(&path, count)?;
             
-            // 检查子目录是否为空（可能已被删除）
             if path.exists() && std::fs::read_dir(&path)?.next().is_none() {
                 std::fs::remove_dir(&path)?;
                 *count += 1;
@@ -182,7 +183,6 @@ fn remove_empty_dirs_recursive(dir: &Path, count: &mut usize) -> Result<()> {
         }
     }
 
-    // 如果当前目录为空且不是根目录，则删除
     if !has_content && dir != Path::new("") && dir != Path::new("/") {
         std::fs::remove_dir(dir)?;
         *count += 1;
@@ -190,4 +190,68 @@ fn remove_empty_dirs_recursive(dir: &Path, count: &mut usize) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn create_zip_archive<F>(
+    source_dir: &Path,
+    dest_path: &Path,
+    file_filter: F,
+) -> Result<PathBuf>
+where
+    F: Fn(&Path) -> bool,
+{
+    let folder_name = source_dir
+        .file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or("output");
+    
+    let zip_path = dest_path.join(format!("{}.zip", folder_name));
+    
+    let file = fs::File::create(&zip_path)?;
+    let mut zip = ZipWriter::new(file);
+    
+    let options: FileOptions<'_, ()> = FileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    
+    let zip_filename = zip_path.file_name().unwrap_or_default().to_str().unwrap_or("");
+    
+    let walkdir = WalkDir::new(source_dir);
+    let it = walkdir.into_iter().filter_map(|e| e.ok());
+    
+    for entry in it {
+        let path = entry.path();
+        
+        if path.file_name().unwrap_or_default().to_str().unwrap_or("") == zip_filename {
+            continue;
+        }
+        
+        if !file_filter(path) {
+            continue;
+        }
+        
+        if let Ok(name) = path.strip_prefix(source_dir) {
+            if path.is_file() {
+                if let Some(name_str) = name.to_str() {
+                    zip.start_file(name_str, options)?;
+                    let mut f = fs::File::open(path)?;
+                    let mut buffer = Vec::new();
+                    f.read_to_end(&mut buffer)?;
+                    zip.write_all(&buffer)?;
+                }
+            }
+        }
+    }
+    
+    zip.finish()?;
+    Ok(zip_path)
+}
+
+pub fn find_file(dir: &Path, filename: &str) -> Option<PathBuf> {
+    let file_path = dir.join(filename);
+    if file_path.exists() {
+        Some(file_path)
+    } else {
+        None
+    }
 }

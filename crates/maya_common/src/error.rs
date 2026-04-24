@@ -86,6 +86,16 @@ impl Error {
     }
 }
 
+/// 从 zip::result::ZipError 转换
+impl From<zip::result::ZipError> for Error {
+    fn from(err: zip::result::ZipError) -> Self {
+        match err {
+            zip::result::ZipError::Io(e) => Self::Io(e),
+            _ => Self::Other(err.to_string()),
+        }
+    }
+}
+
 /// 从 anyhow::Error 转换
 #[cfg(feature = "anyhow")]
 impl From<anyhow::Error> for Error {

@@ -10,23 +10,29 @@ npm i maya-cli-rs -g
 
 ```bash
 
-maya -c n # 清除node_modules
-maya -c lock # 清除package-lock.json, yarn.lock, pnpm-lock.yaml
-maya -g m # 会在当前目录下面执行 git add . && git commit -m 'update' && git push
-maya -p a # 会检测vite的outDir配置，然后把对应的文件夹打包成zip
-maya -p g # 会忽略当前目录下的.gitignore文件中定义的文件和文件夹，把当前目录下其它所有的文件和文件夹打包成zip文件
+# 完整形式
+maya clean --types n     # 清除node_modules
+maya clean -t n          # 同上（-t 是 --types 的短参数）
+maya c -t n              # 同上（c 是 clean 的别名）
+
+# 短个别名形式（等效）
+maya c -t n          # 清除node_modules
+maya c -t lock       # 清除lock文件
+maya g -o m          # git add . && git commit && git push
+maya p -t a          # 会检测vite的outDir配置，然后把对应的文件夹打包成zip
+maya p -t g          # 会忽略当前目录下的.gitignore文件中定义的文件和文件夹，把当前目录下其它所有的文件和文件夹打包成zip文件
 ```
 
 ```bash
-maya -o all # 会把当前目录下面png，jpg，jpeg这三种格式的所以的图片，在保证质量的前提下压缩体积，默认复写模式
-maya -o n all # 添加 n，从复写模式改成新文件模式
-maya -o png # 只压缩png图片
-maya -o jpg # 只压缩jpg图片
-maya -o jpeg # 只压缩jpeg图片
+maya optimize -t all    # 压缩所有png/jpg/jpeg，默认覆写
+maya o -t n all        # 添加 n → 新文件模式
+maya o -t png          # 只压缩png
+maya o -t jpg          # 只压缩jpg
 ```
 
 ```bash
-maya -t mp4 m3u8 # 会把当前目录下面所有的mp4视频转换成m3u8格式，转换后的文件会放在以原视频名称命名的文件夹中
+maya transform -t mp4 m3u8  # mp4视频转m3u8
+maya t -t mp4 m3u8           # 同上
 ```
 
 ## 3. 特性

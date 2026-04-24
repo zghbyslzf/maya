@@ -21,7 +21,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// 清理操作
+    /// 清理操作 (别名为 c)
+    #[command(visible_alias = "c")]
     Clean {
         /// 操作目录路径，默认为当前目录
         #[arg(default_value = ".", value_name = "PATH")]
@@ -32,7 +33,8 @@ enum Command {
         types: Vec<String>,
     },
 
-    /// Git相关操作
+    /// Git相关操作 (别名为 g)
+    #[command(visible_alias = "g")]
     Git {
         /// 操作目录路径，默认为当前目录
         #[arg(default_value = ".", value_name = "PATH")]
@@ -43,14 +45,16 @@ enum Command {
         ops: Vec<String>,
     },
 
-    /// 打包操作
+    /// 打包操作 (别名为 p)
+    #[command(visible_alias = "p")]
     Pack {
         /// 打包操作类型 (g: 根据gitignore打包, a: Vite项目打包)
         #[arg(short = 't', long, value_name = "PACK_TYPE", required = true)]
         pack_type: String,
     },
 
-    /// 图片压缩操作
+    /// 图片压缩操作 (别名为 o)
+    #[command(visible_alias = "o")]
     Optimize {
         /// 操作目录路径，默认为当前目录
         #[arg(default_value = ".", value_name = "PATH")]
@@ -61,7 +65,8 @@ enum Command {
         types: Vec<String>,
     },
 
-    /// 视频转换操作
+    /// 视频转换操作 (别名为 t)
+    #[command(visible_alias = "t")]
     Transform {
         /// 操作目录路径，默认为当前目录
         #[arg(default_value = ".", value_name = "PATH")]

@@ -199,7 +199,7 @@ async fn ensure_ffmpeg_available() -> Result<()> {
     });
 
     // 自动下载FFmpeg
-    let download_result = tokio::task::spawn_blocking(|| auto_download())
+    let download_result = tokio::task::spawn_blocking(auto_download)
         .await
         .map_err(|e| Error::video_conversion(format!("FFmpeg下载任务失败: {}", e)))?;
 
