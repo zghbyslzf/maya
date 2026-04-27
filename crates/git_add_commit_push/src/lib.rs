@@ -1,8 +1,8 @@
 use maya_common::error::{Error, Result};
 use std::process::{Command, Stdio};
 
-/// 在指定目录依次执行 git add .、git commit -m "feat: update"、git push
-pub fn git_add_commit_push(path: String) -> Result<()> {
+/// 在指定目录依次执行 git add .、git commit、git push
+pub fn git_add_commit_push(path: String, message: &str) -> Result<()> {
     let add_status = Command::new("git")
         .arg("add")
         .arg(".")
@@ -17,7 +17,7 @@ pub fn git_add_commit_push(path: String) -> Result<()> {
     let commit_output = Command::new("git")
         .arg("commit")
         .arg("-m")
-        .arg("feat: update")
+        .arg(message)
         .current_dir(&path)
         .output()?;
     if !commit_output.status.success() {

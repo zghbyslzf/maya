@@ -1,4 +1,5 @@
 use image::{self};
+use indicatif::{ProgressBar, ProgressStyle};
 use maya_common::error::{Error, Result};
 use maya_common::file_utils::find_files_by_extension;
 use oxipng::{optimize_from_memory, Options};
@@ -86,13 +87,31 @@ pub fn compress_images_parallel(
     let extensions = extensions_for_type(&img_type);
     let image_files = find_files_by_extension(path, &extensions)?;
 
+    let total = image_files.len();
+    if total == 0 {
+        print_summary(0, 0, 0, 0.0);
+        return Ok((0, 0, 0.0));
+    }
+
+    let pb = ProgressBar::new(total as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("█▉▊▋▌▍▎▏  "),
+    );
+    pb.set_message("压缩中...");
+
     let results: Vec<(PathBuf, Result<f64>)> = image_files
         .par_iter()
         .map(|file_path| {
             let result = compress_image(file_path, create_new_file);
+            pb.inc(1);
             (file_path.clone(), result)
         })
         .collect();
+
+    pb.finish_and_clear();
 
     let mut successful_compressions = 0;
     let mut failed_compressions = 0;

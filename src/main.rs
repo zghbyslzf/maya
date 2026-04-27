@@ -43,6 +43,10 @@ enum Command {
         /// Git操作类型
         #[arg(short = 'o', long, num_args = 1.., value_name = "GIT_OPS", required = true)]
         ops: Vec<String>,
+
+        /// 自定义 commit message（默认: feat: update）
+        #[arg(short = 'm', long, value_name = "MESSAGE")]
+        message: Option<String>,
     },
 
     /// 打包操作 (别名为 p)
@@ -86,8 +90,8 @@ async fn main() -> Result<()> {
         Command::Clean { types, path } => {
             modules::clean_ops::handle_clean_ops(&types, &path)?;
         }
-        Command::Git { ops, path } => {
-            modules::git_ops::handle_git_ops(&ops, &path)?;
+        Command::Git { ops, path, message } => {
+            modules::git_ops::handle_git_ops(&ops, &path, message.as_deref())?;
         }
         Command::Pack { pack_type } => {
             modules::pack_ops::handle_pack_ops(&pack_type)?;
