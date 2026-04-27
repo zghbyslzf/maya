@@ -393,7 +393,6 @@ version = "0.1.0"
 dependencies = [
  "maya_common",
  "tempfile",
- "walkdir",
 ]
 
 [[package]]
@@ -412,14 +411,12 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 name = "compress_pictures"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "image",
  "indicatif",
  "maya_common",
  "oxipng",
  "rayon",
  "tempfile",
- "walkdir",
 ]
 
 [[package]]
@@ -780,8 +777,6 @@ version = "0.1.0"
 dependencies = [
  "ignore",
  "maya_common",
- "walkdir",
- "zip",
 ]
 
 [[package]]
@@ -1067,12 +1062,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itoa"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
-
-[[package]]
 name = "jobserver"
 version = "0.1.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1222,7 +1211,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "rayon",
- "regex",
  "thiserror",
  "tokio",
  "walkdir",
@@ -1276,13 +1264,10 @@ dependencies = [
 name = "mp4_to_m3u8"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "ffmpeg-sidecar",
  "indicatif",
  "maya_common",
- "regex",
  "tokio",
- "walkdir",
 ]
 
 [[package]]
@@ -1810,12 +1795,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eded382c5f5f786b989652c49544c4877d9f015cc22e145a5ea8ea66c2921cd2"
 
 [[package]]
-name = "ryu"
-version = "1.0.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
-
-[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1842,18 +1821,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "serde_json"
-version = "1.0.140"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20068b6e96dc6c9bd23e01df8827e6c7e1f2fddd43c21810382803c136b99373"
-dependencies = [
- "itoa",
- "memchr",
- "ryu",
- "serde",
 ]
 
 [[package]]
@@ -2238,9 +2205,6 @@ version = "0.1.0"
 dependencies = [
  "maya_common",
  "regex",
- "serde_json",
- "walkdir",
- "zip",
 ]
 
 [[package]]

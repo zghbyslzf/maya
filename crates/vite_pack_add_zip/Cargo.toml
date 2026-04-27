@@ -6,8 +6,5 @@ license = "MIT"
 description = "会检测vite的outDir配置，然后把对应的文件夹打包成zip"
 
 [dependencies]
-zip = { workspace = true }
-serde_json = { workspace = true }
-walkdir = { workspace = true }
 regex = { workspace = true }
 maya_common = { workspace = true }

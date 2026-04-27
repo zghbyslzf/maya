@@ -42,7 +42,6 @@ walkdir = "2.5"
 zip = "2.6.1"
 regex = "1.10.3"
 ignore = "0.4.22"
-serde_json = "1.0"
 tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros"] }
 anyhow = "1.0"
 thiserror = "1.0"

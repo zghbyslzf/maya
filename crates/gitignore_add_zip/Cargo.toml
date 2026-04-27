@@ -5,7 +5,5 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-walkdir = { workspace = true }
-zip = { workspace = true }
 ignore = { workspace = true }
 maya_common = { workspace = true }
