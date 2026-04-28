@@ -1,6 +1,18 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use maya_common::error::Result;
+use regex::Regex;
+
+static OUT_DIR_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(outDir\s*[:=]\s*['"]?)([^,'"}\s]+)['"]?"#).unwrap()
+});
+static BUILD_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?s)build\s*:\s*\{.*?outDir\s*[:=]\s*['"]?([^'"},]+)"#).unwrap()
+});
+static NESTED_OUT_DIR_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"outDir\s*[:=]\s*['"]?([^,'"}\s]+)['"]?"#).unwrap()
+});
 
 /// Vite打包模块，负责查找Vite配置并将输出目录打包为zip
 pub fn handle_vite_pack() -> Result<()> {
@@ -52,11 +64,7 @@ fn find_vite_config() -> Option<PathBuf> {
 fn get_out_dir(config_path: &Path) -> Option<String> {
     let content = fs::read_to_string(config_path).ok()?;
 
-    // 增强配置解析逻辑
-    let re = regex::Regex::new(r#"(outDir\s*[:=]\s*['"]?)([^,'"}\s]+)['"]?"#).unwrap();
-
-    // 先尝试正则匹配
-    if let Some(caps) = re.captures(&content) {
+    if let Some(caps) = OUT_DIR_RE.captures(&content) {
         if let Some(m) = caps.get(2) {
             return Some(
                 m.as_str()
@@ -66,15 +74,9 @@ fn get_out_dir(config_path: &Path) -> Option<String> {
         }
     }
 
-    // 处理嵌套对象结构
-    let build_block_re =
-        regex::Regex::new(r#"(?s)build\s*:\s*\{.*?outDir\s*[:=]\s*['"]?([^'"},]+)"#).unwrap();
-    if let Some(caps) = build_block_re.captures(&content) {
+    if let Some(caps) = BUILD_BLOCK_RE.captures(&content) {
         if let Some(block) = caps.get(1) {
-            if let Some(m) = regex::Regex::new(r#"outDir[=:]s*['"]?([^,'"}\s]+)['"]?"#)
-                .unwrap()
-                .find(block.as_str())
-            {
+            if let Some(m) = NESTED_OUT_DIR_RE.find(block.as_str()) {
                 let dir = m
                     .as_str()
                     .split(&[':', '='][..])

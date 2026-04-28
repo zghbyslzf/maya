@@ -82,12 +82,10 @@ where
 /// # 返回
 /// * `Result<Vec<PathBuf>>` - 匹配的文件路径列表
 pub fn find_files_by_extension(dir: &Path, extensions: &[&str]) -> Result<Vec<PathBuf>> {
-    let extension_set: std::collections::HashSet<&str> = extensions.iter().copied().collect();
-    
     find_files(dir, |path| {
         path.extension()
             .and_then(|ext| ext.to_str())
-            .map(|ext| extension_set.contains(&ext.to_lowercase().as_str()))
+            .map(|ext| extensions.iter().any(|e| e.eq_ignore_ascii_case(ext)))
             .unwrap_or(false)
     })
 }
@@ -235,9 +233,12 @@ where
                 if let Some(name_str) = name.to_str() {
                     zip.start_file(name_str, options)?;
                     let mut f = fs::File::open(path)?;
-                    let mut buffer = Vec::new();
-                    f.read_to_end(&mut buffer)?;
-                    zip.write_all(&buffer)?;
+                    let mut buffer = [0u8; 8192];
+                    loop {
+                        let n = f.read(&mut buffer)?;
+                        if n == 0 { break; }
+                        zip.write_all(&buffer[..n])?;
+                    }
                 }
             }
         }

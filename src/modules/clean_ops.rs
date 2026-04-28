@@ -7,12 +7,12 @@ pub fn handle_clean_ops(clean_types: &[String], path: &Path) -> Result<()> {
         match clean_type.as_str() {
             "n" | "node_modules" => {
                 println!("清理目录 {} 中的 node_modules 文件夹", path.display());
-                let count = clear_node_modules::clear_node_modules(path.to_string_lossy().to_string())?;
+                let count = clear_node_modules::clear_node_modules(path)?;
                 println!("已清理 {} 个 node_modules 文件夹", count);
             }
             "lock" => {
                 println!("清理目录 {} 中的锁文件", path.display());
-                let count = clear_lock::clear_lock_files(path.to_string_lossy().to_string())?;
+                let count = clear_lock::clear_lock_files(path)?;
                 println!("已清理 {} 个锁文件", count);
             }
             _ => {

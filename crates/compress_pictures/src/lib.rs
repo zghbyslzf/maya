@@ -42,7 +42,7 @@ fn type_label(img_type: &ImageType) -> &str {
     }
 }
 
-fn extensions_for_type(img_type: &ImageType) -> Vec<&str> {
+pub fn extensions_for_type(img_type: &ImageType) -> Vec<&str> {
     match img_type {
         ImageType::Png => vec!["png"],
         ImageType::Jpg => vec!["jpg"],

@@ -1,5 +1,6 @@
 use ignore::WalkBuilder;
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use maya_common::error::Result;
 
 pub fn handle_gitignore_pack() -> Result<()> {
@@ -21,17 +22,15 @@ pub fn handle_gitignore_pack() -> Result<()> {
 fn create_zip_from_gitignore(
     source_dir: &Path,
     dest_path: &Path,
-) -> Result<std::path::PathBuf> {
-    // 使用ignore库来尊重.gitignore规则
+) -> Result<PathBuf> {
     let walker = WalkBuilder::new(source_dir)
-        .hidden(false) // 不跳过隐藏文件，让.gitignore规则处理
-        .git_global(false) // 忽略全局git规则
-        .git_ignore(true) // 使用.gitignore规则
-        .require_git(false) // 不需要Git仓库
+        .hidden(false)
+        .git_global(false)
+        .git_ignore(true)
+        .require_git(false)
         .build();
 
-    // 收集忽略规则允许的文件
-    let mut allowed_files = vec![];
+    let mut allowed_files: HashSet<PathBuf> = HashSet::new();
 
     for entry in walker.flatten() {
         let path = entry.path();
@@ -40,13 +39,11 @@ fn create_zip_from_gitignore(
             continue;
         }
 
-        allowed_files.push(path.to_path_buf());
+        allowed_files.insert(path.to_path_buf());
     }
 
-    // 创建zip文件 - 使用maya_common中的函数
     let zip_path = maya_common::create_zip_archive(source_dir, dest_path, |path| {
-        // 只包含在allowed_files中的文件
-        path.is_file() && allowed_files.iter().any(|p| p == path)
+        path.is_file() && allowed_files.contains(path)
     })?;
 
     Ok(zip_path)

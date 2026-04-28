@@ -184,8 +184,7 @@ async fn ensure_ffmpeg_available() -> Result<()> {
     );
     pb.set_message("正在下载FFmpeg二进制文件...");
 
-    // 模拟下载进度（因为auto_download不支持进度回调）
-    tokio::spawn({
+    let progress_handle = tokio::spawn({
         let pb = pb.clone();
         async move {
             for i in 0..=100 {
@@ -202,6 +201,8 @@ async fn ensure_ffmpeg_available() -> Result<()> {
     let download_result = tokio::task::spawn_blocking(auto_download)
         .await
         .map_err(|e| Error::video_conversion(format!("FFmpeg下载任务失败: {}", e)))?;
+
+    progress_handle.abort();
 
     match download_result {
         Ok(_) => {
