@@ -7,11 +7,8 @@ pub async fn handle_transform_ops(types: &[String], path: &Path) -> Result<()> {
         return Err(Error::invalid_argument("请指定源格式和目标格式，例如: maya -t mp4 m3u8".to_string()));
     }
 
-    let source_format = &types[0].to_lowercase();
-    let target_format = &types[1].to_lowercase();
-
-    match (source_format.as_str(), target_format.as_str()) {
-        ("mp4", "m3u8") => {
+    match (types[0].as_str(), types[1].as_str()) {
+        (s, t) if s.eq_ignore_ascii_case("mp4") && t.eq_ignore_ascii_case("m3u8") => {
             let (successful_conversions, failed_conversions) = mp4_to_m3u8::convert_mp4_to_m3u8(path).await?;
             if successful_conversions == 0 && failed_conversions == 0 {
                 println!("未找到任何mp4文件进行转换。");
@@ -22,7 +19,7 @@ pub async fn handle_transform_ops(types: &[String], path: &Path) -> Result<()> {
             }
         },
         _ => {
-            return Err(Error::invalid_argument(format!("暂不支持从 {} 转换到 {} 的格式。目前支持的转换: mp4 -> m3u8", source_format, target_format)));
+            return Err(Error::invalid_argument(format!("暂不支持从 {} 转换到 {} 的格式。目前支持的转换: mp4 -> m3u8", types[0], types[1])));
         }
     }
     Ok(())

@@ -5,7 +5,7 @@ use maya_common::file_utils::find_files_by_extension;
 use oxipng::{optimize_from_memory, Options};
 use rayon::prelude::*;
 use std::fs;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -97,7 +97,7 @@ pub fn compress_images_parallel(
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .unwrap()
+            .expect("无效的进度条模板字符串")
             .progress_chars("█▉▊▋▌▍▎▏  "),
     );
     pb.set_message("压缩中...");
@@ -176,7 +176,6 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
     let file = fs::File::open(image_path)?;
     let mut reader = BufReader::new(file);
     let mut input_data = Vec::new();
-    use std::io::Read;
     reader.read_to_end(&mut input_data)?;
 
     // 使用默认优化选项
@@ -201,7 +200,6 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
         // 体积变小，执行覆写，使用 BufWriter
         let file = fs::File::create(image_path)?;
         let mut writer = BufWriter::new(file);
-        use std::io::Write;
         writer.write_all(&output_data_in_memory)?;
         writer.flush()?;
         let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
@@ -211,7 +209,6 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
         let output_path = create_output_path(image_path, "_c");
         let file = fs::File::create(&output_path)?;
         let mut writer = BufWriter::new(file);
-        use std::io::Write;
         writer.write_all(&output_data_in_memory)?;
         writer.flush()?;
 
@@ -254,7 +251,6 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
         // 体积变小，执行覆写，使用 BufWriter
         let file = fs::File::create(image_path)?;
         let mut writer = BufWriter::new(file);
-        use std::io::Write;
         writer.write_all(&buffer)?;
         writer.flush()?;
         let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
@@ -264,7 +260,6 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
         let output_path = create_output_path(image_path, "_c");
         let file = fs::File::create(&output_path)?;
         let mut writer = BufWriter::new(file);
-        use std::io::Write;
         img.write_to(&mut writer, image::ImageFormat::Jpeg)
             .map_err(|e| Error::compression(format!("图片保存失败: {}", e)))?;
         writer.flush()?;

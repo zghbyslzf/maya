@@ -181,7 +181,7 @@ fn remove_empty_dirs_recursive(dir: &Path, count: &mut usize) -> Result<()> {
         }
     }
 
-    if !has_content && dir != Path::new("") && dir != Path::new("/") {
+    if !has_content && dir.parent().is_some() {
         std::fs::remove_dir(dir)?;
         *count += 1;
         println!("已删除空目录: {}", dir.display());

@@ -92,7 +92,7 @@ async fn convert_single_mp4(mp4_file: &Path) -> Result<()> {
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}% {msg}")
-            .unwrap()
+            .expect("无效的进度条模板字符串")
             .progress_chars("█▉▊▋▌▍▎▏  "),
     );
     pb.set_message("正在转换mp4到m3u8...");
@@ -179,7 +179,7 @@ async fn ensure_ffmpeg_available() -> Result<()> {
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.blue} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}% {msg}")
-            .unwrap()
+            .expect("无效的进度条模板字符串")
             .progress_chars("█▉▊▋▌▍▎▏  "),
     );
     pb.set_message("正在下载FFmpeg二进制文件...");
@@ -269,9 +269,12 @@ fn get_video_duration(mp4_file: &Path) -> Result<f64> {
 fn parse_time_string(time_str: &str) -> Result<f64> {
     let parts: Vec<&str> = time_str.split(':').collect();
     if parts.len() == 3 {
-        let hours: f64 = parts[0].parse().unwrap_or(0.0);
-        let minutes: f64 = parts[1].parse().unwrap_or(0.0);
-        let seconds: f64 = parts[2].parse().unwrap_or(0.0);
+        let hours: f64 = parts[0].parse()
+            .map_err(|_| Error::video_conversion(format!("无效的小时值: {}", parts[0])))?;
+        let minutes: f64 = parts[1].parse()
+            .map_err(|_| Error::video_conversion(format!("无效的分钟值: {}", parts[1])))?;
+        let seconds: f64 = parts[2].parse()
+            .map_err(|_| Error::video_conversion(format!("无效的秒值: {}", parts[2])))?;
         Ok(hours * 3600.0 + minutes * 60.0 + seconds)
     } else {
         Err(Error::video_conversion(format!(
@@ -300,19 +303,16 @@ mod tests {
         assert!(parse_time_string("").is_err());
         assert!(parse_time_string("00:00").is_err());
         assert!(parse_time_string("00:00:00:00").is_err());
-        // 非数字部分会解析为0.0，所以以下字符串会返回0.0而不是错误
-        assert_eq!(parse_time_string("abc:def:ghi").unwrap(), 0.0);
-        assert_eq!(parse_time_string("xx:yy:zz").unwrap(), 0.0);
-        // "00:00:60" 是有效的（60秒），解析为60.0
+        assert!(parse_time_string("abc:def:ghi").is_err());
+        assert!(parse_time_string("xx:yy:zz").is_err());
         assert_eq!(parse_time_string("00:00:60").unwrap(), 60.0);
     }
 
     #[test]
     fn test_parse_time_string_edge_cases() {
-        // 空部分使用默认值0.0
-        assert_eq!(parse_time_string("::").unwrap(), 0.0);
-        assert_eq!(parse_time_string("01::").unwrap(), 3600.0);
-        assert_eq!(parse_time_string(":02:").unwrap(), 120.0);
-        assert_eq!(parse_time_string("::03").unwrap(), 3.0);
+        assert!(parse_time_string("::").is_err());
+        assert!(parse_time_string("01::").is_err());
+        assert!(parse_time_string(":02:").is_err());
+        assert!(parse_time_string("::03").is_err());
     }
 }
