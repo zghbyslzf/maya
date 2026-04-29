@@ -1,4 +1,3 @@
-use image::{self};
 use indicatif::{ProgressBar, ProgressStyle};
 use maya_common::error::{Error, Result};
 use maya_common::file_utils::find_files_by_extension;
@@ -220,6 +219,9 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
 }
 
 /// 压缩JPG/JPEG图片
+///
+/// 注意：JPEG"压缩"是通过 `image` crate 解码后重新编码实现的，属于**有损压缩**，
+/// 可能会导致图片质量变化。如需无损优化 JPEG，建议使用 `mozjpeg` 等专用工具。
 fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
     if original_size as u64 > STREAMING_THRESHOLD {
         println!("文件大小超过阈值，使用缓冲IO处理: {}", image_path.display());
@@ -272,8 +274,10 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
 
 /// 创建输出路径（添加后缀）
 fn create_output_path(input_path: &Path, suffix: &str) -> PathBuf {
-    let stem = input_path.file_stem().unwrap_or_default();
-    let extension = input_path.extension().unwrap_or_default();
+    let stem = input_path.file_stem()
+        .expect("图片文件必须有文件名");
+    let extension = input_path.extension()
+        .expect("图片文件必须有扩展名");
 
     let new_filename = format!(
         "{}{}.{}",

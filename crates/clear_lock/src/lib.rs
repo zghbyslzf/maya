@@ -1,23 +1,29 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
 use maya_common::error::Result;
 use maya_common::file_utils::find_files;
 
+static LOCK_FILES: LazyLock<HashSet<&str>> = LazyLock::new(|| {
+    ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
+        .iter()
+        .copied()
+        .collect()
+});
+
 /// 清除目录中的锁文件 (package-lock.json, yarn.lock 等)
 pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> Result<usize> {
-    let lock_files = ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
-    let lock_files_set: std::collections::HashSet<&str> = lock_files.iter().copied().collect();
-
     // 使用共享的文件遍历函数查找所有文件
     let all_files = find_files(dir.as_ref(), |path| {
         // 只检查文件
         if !path.is_file() {
             return false;
         }
-        
+
         // 获取文件名
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            lock_files_set.contains(file_name)
+            LOCK_FILES.contains(file_name)
         } else {
             false
         }
