@@ -8,7 +8,6 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-const STREAMING_THRESHOLD: u64 = 10 * 1024 * 1024; // 10 MB
 /// 压缩图片类型枚举
 #[derive(Debug, PartialEq)]
 pub enum ImageType {
@@ -154,12 +153,15 @@ fn compress_image(image_path: &Path, create_new_file: bool) -> Result<f64> {
     let original_size = fs::metadata(image_path)?.len() as f64;
 
     if let Some(extension) = image_path.extension() {
-        let ext = extension.to_string_lossy().to_lowercase();
+        let ext = extension.to_string_lossy();
+        let ext_str = ext.as_ref();
 
-        match ext.as_str() {
-            "png" => compress_png(image_path, create_new_file, original_size),
-            "jpg" | "jpeg" => compress_jpg(image_path, create_new_file, original_size),
-            _ => Err(Error::compression(format!("不支持的图片格式: {}", ext))),
+        if ext_str.eq_ignore_ascii_case("png") {
+            compress_png(image_path, create_new_file, original_size)
+        } else if ext_str.eq_ignore_ascii_case("jpg") || ext_str.eq_ignore_ascii_case("jpeg") {
+            compress_jpg(image_path, create_new_file, original_size)
+        } else {
+            Err(Error::compression(format!("不支持的图片格式: {}", ext_str)))
         }
     } else {
         Err(Error::compression("文件没有扩展名"))
@@ -168,9 +170,6 @@ fn compress_image(image_path: &Path, create_new_file: bool) -> Result<f64> {
 
 /// 压缩PNG图片
 fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
-    if original_size as u64 > STREAMING_THRESHOLD {
-        println!("文件大小超过阈值，使用缓冲IO处理: {}", image_path.display());
-    }
     // 使用 BufReader 读取文件
     let file = fs::File::open(image_path)?;
     let mut reader = BufReader::new(file);
@@ -223,9 +222,6 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
 /// 注意：JPEG"压缩"是通过 `image` crate 解码后重新编码实现的，属于**有损压缩**，
 /// 可能会导致图片质量变化。如需无损优化 JPEG，建议使用 `mozjpeg` 等专用工具。
 fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
-    if original_size as u64 > STREAMING_THRESHOLD {
-        println!("文件大小超过阈值，使用缓冲IO处理: {}", image_path.display());
-    }
     // 使用 BufReader 打开图片
     let file = fs::File::open(image_path)?;
     let reader = BufReader::new(file);

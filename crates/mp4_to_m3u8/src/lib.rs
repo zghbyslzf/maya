@@ -230,7 +230,7 @@ fn is_ffmpeg_available() -> bool {
 
 /// 获取视频时长
 fn get_video_duration(mp4_file: &Path) -> Result<f64> {
-    let output = std::process::Command::new("ffprobe")
+    let output = std::process::Command::new(ffmpeg_sidecar::ffprobe::ffprobe_path())
         .args([
             "-v",
             "quiet",
