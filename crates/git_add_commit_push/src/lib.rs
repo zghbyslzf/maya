@@ -1,19 +1,18 @@
 use maya_common::error::{Error, Result};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 /// 在指定目录依次执行 git add .、git commit、git push
 pub fn git_add_commit_push(path: impl AsRef<Path>, message: &str) -> Result<()> {
     let path = path.as_ref();
 
-    let add_status = Command::new("git")
+    let add_output = Command::new("git")
         .arg("add")
         .arg(".")
         .current_dir(path)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
-    if !add_status.success() {
+        .output()?;
+    if !add_output.status.success() {
+        print_command_stderr(&add_output.stderr);
         return Err(Error::command_execution("git add 失败"));
     }
 
@@ -29,7 +28,7 @@ pub fn git_add_commit_push(path: impl AsRef<Path>, message: &str) -> Result<()> 
             println!("没有变更，无需提交");
             return Ok(());
         } else {
-            eprintln!("{}", stderr);
+            print_command_stderr(&commit_output.stderr);
             return Err(Error::git("git commit 失败"));
         }
     } else {
@@ -39,14 +38,18 @@ pub fn git_add_commit_push(path: impl AsRef<Path>, message: &str) -> Result<()> 
         }
     }
 
-    let push_status = Command::new("git")
-        .arg("push")
-        .current_dir(path)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()?;
-    if !push_status.success() {
+    let push_output = Command::new("git").arg("push").current_dir(path).output()?;
+    if !push_output.status.success() {
+        print_command_stderr(&push_output.stderr);
         return Err(Error::command_execution("git push 失败"));
     }
     Ok(())
+}
+
+fn print_command_stderr(stderr: &[u8]) {
+    let stderr = String::from_utf8_lossy(stderr);
+    let stderr = stderr.trim();
+    if !stderr.is_empty() {
+        eprintln!("{stderr}");
+    }
 }

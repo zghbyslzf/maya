@@ -36,16 +36,16 @@ compress_pictures = { version = "0.1.0", path = "crates/compress_pictures" }
 mp4_to_m3u8 = { version = "0.1.0", path = "crates/mp4_to_m3u8" }
 
 # 共享依赖，可以被多个crate使用
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 walkdir = "2.5"
 zip = "2.6.1"
-regex = "1.10.3"
+regex = "1.11"
 ignore = "0.4.22"
 tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros"] }
 anyhow = "1.0"
 thiserror = "1.0"
-rayon = "1.8"
-tempfile = "3.10"
+rayon = "1.10"
+tempfile = "3.19"
 
 [dependencies]
 clap = { workspace = true }
@@ -63,12 +63,3 @@ tokio = { workspace = true }
 assert_cmd = "2.0"
 predicates = "3.0"
 tempfile = { workspace = true }
-
-
-
-
-
-
-
-
-

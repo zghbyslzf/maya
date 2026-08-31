@@ -360,7 +360,7 @@ mod tests {
         assert!(result.is_ok());
         let compression_ratio = result.unwrap();
         // 压缩率应该在0.0到1.0之间（可能是0.0，因为图像太小无法压缩）
-        assert!(compression_ratio >= 0.0 && compression_ratio <= 1.0);
+        assert!((0.0..=1.0).contains(&compression_ratio));
 
         // 检查新文件是否被创建（带有_c后缀）
         let new_file_path = temp_dir.path().join("test_c.png");

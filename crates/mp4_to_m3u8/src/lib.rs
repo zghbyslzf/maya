@@ -1,4 +1,8 @@
-use ffmpeg_sidecar::{command::FfmpegCommand, download::auto_download, event::FfmpegEvent};
+use ffmpeg_sidecar::{
+    command::{ffmpeg_is_installed, FfmpegCommand},
+    download::auto_download,
+    event::FfmpegEvent,
+};
 use indicatif::{ProgressBar, ProgressStyle};
 use maya_common::error::{Error, Result};
 use maya_common::file_utils::find_files_by_extension;
@@ -168,7 +172,7 @@ async fn convert_single_mp4(mp4_file: &Path) -> Result<()> {
 /// 确保FFmpeg可用，如果不可用则自动下载
 async fn ensure_ffmpeg_available() -> Result<()> {
     // 尝试检查FFmpeg是否已经可用
-    if is_ffmpeg_available() {
+    if ffmpeg_is_installed() {
         return Ok(());
     }
 
@@ -216,18 +220,6 @@ async fn ensure_ffmpeg_available() -> Result<()> {
     }
 }
 
-/// 检查ffmpeg是否可用
-fn is_ffmpeg_available() -> bool {
-    // 简单的检查方式：尝试执行FFmpeg版本命令
-    match std::process::Command::new("ffmpeg")
-        .args(["-version"])
-        .output()
-    {
-        Ok(output) => output.status.success(),
-        Err(_) => false,
-    }
-}
-
 /// 获取视频时长
 fn get_video_duration(mp4_file: &Path) -> Result<f64> {
     let output = std::process::Command::new(ffmpeg_sidecar::ffprobe::ffprobe_path())
@@ -269,11 +261,14 @@ fn get_video_duration(mp4_file: &Path) -> Result<f64> {
 fn parse_time_string(time_str: &str) -> Result<f64> {
     let parts: Vec<&str> = time_str.split(':').collect();
     if parts.len() == 3 {
-        let hours: f64 = parts[0].parse()
+        let hours: f64 = parts[0]
+            .parse()
             .map_err(|_| Error::video_conversion(format!("无效的小时值: {}", parts[0])))?;
-        let minutes: f64 = parts[1].parse()
+        let minutes: f64 = parts[1]
+            .parse()
             .map_err(|_| Error::video_conversion(format!("无效的分钟值: {}", parts[1])))?;
-        let seconds: f64 = parts[2].parse()
+        let seconds: f64 = parts[2]
+            .parse()
             .map_err(|_| Error::video_conversion(format!("无效的秒值: {}", parts[2])))?;
         Ok(hours * 3600.0 + minutes * 60.0 + seconds)
     } else {
