@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::report::ArchiveReport;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -321,7 +322,6 @@ fn remove_empty_dirs_recursive(dir: &Path, count: &mut usize) -> Result<()> {
             if path.exists() && std::fs::read_dir(&path)?.next().is_none() {
                 std::fs::remove_dir(&path)?;
                 *count += 1;
-                println!("已删除空目录: {}", path.display());
             } else {
                 has_content = true;
             }
@@ -333,13 +333,16 @@ fn remove_empty_dirs_recursive(dir: &Path, count: &mut usize) -> Result<()> {
     if !has_content && dir.parent().is_some() {
         std::fs::remove_dir(dir)?;
         *count += 1;
-        println!("已删除空目录: {}", dir.display());
     }
 
     Ok(())
 }
 
-pub fn create_zip_archive<F>(source_dir: &Path, dest_path: &Path, file_filter: F) -> Result<PathBuf>
+pub fn create_zip_archive<F>(
+    source_dir: &Path,
+    dest_path: &Path,
+    file_filter: F,
+) -> Result<ArchiveReport>
 where
     F: Fn(&Path) -> bool,
 {
@@ -364,6 +367,8 @@ where
 
     let zip_path = dest_path.join(format!("{}.zip", folder_name));
 
+    let mut files_added = 0usize;
+    let mut source_bytes = 0u64;
     atomic_write(&zip_path, |file, temp_path| {
         let mut zip = ZipWriter::new(file);
         let options: FileOptions<'_, ()> =
@@ -391,6 +396,8 @@ where
                 })?;
                 zip.start_file(name_str.replace('\\', "/"), options)?;
                 let mut source_file = fs::File::open(path)?;
+                source_bytes += entry.metadata()?.len();
+                files_added += 1;
                 let mut buffer = [0u8; 8192];
                 loop {
                     let bytes_read = source_file.read(&mut buffer)?;
@@ -406,7 +413,13 @@ where
         Ok(())
     })?;
 
-    Ok(zip_path)
+    let archive_bytes = fs::metadata(&zip_path)?.len();
+    Ok(ArchiveReport {
+        archive_path: zip_path,
+        files_added,
+        source_bytes,
+        archive_bytes,
+    })
 }
 
 pub fn find_file(dir: &Path, filename: &str) -> Option<PathBuf> {

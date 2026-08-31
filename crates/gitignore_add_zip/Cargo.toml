@@ -7,3 +7,6 @@ license = "MIT"
 [dependencies]
 ignore = { workspace = true }
 maya_common = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

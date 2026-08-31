@@ -8,3 +8,6 @@ description = "会检测vite的outDir配置，然后把对应的文件夹打包�
 [dependencies]
 regex = { workspace = true }
 maya_common = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

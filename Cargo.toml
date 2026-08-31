@@ -63,3 +63,4 @@ tokio = { workspace = true }
 assert_cmd = "2.0"
 predicates = "3.0"
 tempfile = { workspace = true }
+image = "0.25.6"

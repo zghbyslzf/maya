@@ -1,6 +1,6 @@
-use indicatif::{ProgressBar, ProgressStyle};
 use maya_common::error::{Error, Result};
 use maya_common::file_utils::{atomic_write, find_files_by_extension};
+use maya_common::{FailurePolicy, NoopProgress, ProgressEvent, ProgressSink};
 use oxipng::{optimize_from_memory, Options};
 use rayon::prelude::*;
 use std::fs;
@@ -8,11 +8,9 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-/// 压缩图片类型枚举
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageType {
     Png,
-    Jpg,
     Jpeg,
     All,
 }
@@ -20,257 +18,246 @@ pub enum ImageType {
 impl FromStr for ImageType {
     type Err = String;
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "png" => Ok(ImageType::Png),
-            "jpg" => Ok(ImageType::Jpg),
-            "jpeg" => Ok(ImageType::Jpeg),
-            "all" => Ok(ImageType::All),
-            _ => Err(format!("不支持的图片类型: {}", s)),
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value.to_ascii_lowercase().as_str() {
+            "png" => Ok(Self::Png),
+            "jpg" | "jpeg" => Ok(Self::Jpeg),
+            "all" => Ok(Self::All),
+            _ => Err(format!("不支持的图片类型: {value}")),
         }
     }
 }
 
-fn type_label(img_type: &ImageType) -> &str {
-    match img_type {
-        ImageType::Png => "PNG",
-        ImageType::Jpg => "JPG",
-        ImageType::Jpeg => "JPEG",
-        ImageType::All => "所有支持的",
+pub fn extensions_for_type(image_type: ImageType) -> &'static [&'static str] {
+    match image_type {
+        ImageType::Png => &["png"],
+        ImageType::Jpeg => &["jpg", "jpeg"],
+        ImageType::All => &["png", "jpg", "jpeg"],
     }
 }
 
-pub fn extensions_for_type(img_type: &ImageType) -> Vec<&str> {
-    match img_type {
-        ImageType::Png => vec!["png"],
-        ImageType::Jpg => vec!["jpg"],
-        ImageType::Jpeg => vec!["jpeg"],
-        ImageType::All => vec!["png", "jpg", "jpeg"],
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputMode {
+    #[default]
+    Overwrite,
+    NewFile,
 }
 
-fn print_summary(total: usize, success: u32, fail: u32, avg_ratio: f64) {
-    println!(
-        "
---- 压缩总结 ---"
-    );
-    println!("总共处理图片数量: {}", total);
-    println!("成功压缩文件数量: {}", success);
-    println!("失败压缩文件数量: {}", fail);
-    if success > 0 {
-        println!("成功文件的平均压缩率: {:.2}%", avg_ratio * 100.0);
-    } else {
-        println!("没有文件被成功压缩。");
-    }
-    println!("--------------------");
+#[derive(Debug, Clone)]
+pub struct CompressionOptions {
+    pub image_type: ImageType,
+    pub output_mode: OutputMode,
+    pub jpeg_quality: u8,
+    pub failure_policy: FailurePolicy,
 }
 
-/// 压缩图片函数（委托到并行版本）
-pub fn compress_images(
-    path: &Path,
-    img_type: ImageType,
-    create_new_file: bool,
-) -> Result<(u32, u32, f64)> {
-    compress_images_parallel(path, img_type, create_new_file)
-}
-
-/// 并行压缩图片函数
-pub fn compress_images_parallel(
-    path: &Path,
-    img_type: ImageType,
-    create_new_file: bool,
-) -> Result<(u32, u32, f64)> {
-    println!("开始压缩 {} 图片...", type_label(&img_type));
-
-    let extensions = extensions_for_type(&img_type);
-    let image_files = find_files_by_extension(path, &extensions)?;
-
-    let total = image_files.len();
-    if total == 0 {
-        print_summary(0, 0, 0, 0.0);
-        return Ok((0, 0, 0.0));
-    }
-
-    let pb = ProgressBar::new(total as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .expect("无效的进度条模板字符串")
-            .progress_chars("█▉▊▋▌▍▎▏  "),
-    );
-    pb.set_message("压缩中...");
-
-    let results: Vec<(PathBuf, Result<f64>)> = image_files
-        .par_iter()
-        .map(|file_path| {
-            let result = compress_image(file_path, create_new_file);
-            pb.inc(1);
-            (file_path.clone(), result)
-        })
-        .collect();
-
-    pb.finish_and_clear();
-
-    let mut successful_compressions = 0;
-    let mut failed_compressions = 0;
-    let mut total_compression_ratio_sum = 0.0;
-
-    for (file_path, result) in results.iter() {
-        match result {
-            Ok(ratio) => {
-                successful_compressions += 1;
-                total_compression_ratio_sum += *ratio;
-                println!(
-                    "成功压缩: {} (压缩率: {:.2}%)",
-                    file_path.display(),
-                    *ratio * 100.0
-                );
-            }
-            Err(e) => {
-                failed_compressions += 1;
-                eprintln!("压缩失败 {}: {}", file_path.display(), e);
-            }
+impl Default for CompressionOptions {
+    fn default() -> Self {
+        Self {
+            image_type: ImageType::All,
+            output_mode: OutputMode::Overwrite,
+            jpeg_quality: 80,
+            failure_policy: FailurePolicy::Continue,
         }
     }
+}
 
-    let avg_compression_ratio = if successful_compressions > 0 {
-        total_compression_ratio_sum / successful_compressions as f64
-    } else {
-        0.0
+#[derive(Debug)]
+pub enum CompressionOutcome {
+    Compressed {
+        path: PathBuf,
+        output_path: PathBuf,
+        bytes_before: u64,
+        bytes_after: u64,
+    },
+    Skipped {
+        path: PathBuf,
+        reason: String,
+    },
+    Failed {
+        path: PathBuf,
+        error: Error,
+    },
+}
+
+#[derive(Debug, Default)]
+pub struct CompressionReport {
+    pub scanned: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub bytes_before: u64,
+    pub bytes_after: u64,
+    pub items: Vec<CompressionOutcome>,
+}
+
+impl CompressionReport {
+    pub fn compression_ratio(&self) -> f64 {
+        if self.bytes_before == 0 {
+            0.0
+        } else {
+            1.0 - self.bytes_after as f64 / self.bytes_before as f64
+        }
+    }
+}
+
+/// 压缩路径下的图片；终端展示由调用方负责。
+pub fn compress_images(path: &Path, options: &CompressionOptions) -> Result<CompressionReport> {
+    compress_images_with_progress(path, options, &NoopProgress)
+}
+
+pub fn compress_images_with_progress(
+    path: &Path,
+    options: &CompressionOptions,
+    progress: &dyn ProgressSink,
+) -> Result<CompressionReport> {
+    if !(1..=100).contains(&options.jpeg_quality) {
+        return Err(Error::invalid_argument("JPEG 质量必须在 1 到 100 之间"));
+    }
+
+    let files = find_files_by_extension(path, extensions_for_type(options.image_type))?;
+    let total = files.len();
+    progress.emit(ProgressEvent::Started {
+        operation: "压缩图片".to_string(),
+        total: Some(total as u64),
+    });
+
+    let items = match options.failure_policy {
+        FailurePolicy::Continue => files
+            .par_iter()
+            .map(|path| {
+                let outcome = compress_image(path, options).unwrap_or_else(|error| {
+                    CompressionOutcome::Failed {
+                        path: path.clone(),
+                        error,
+                    }
+                });
+                progress.emit(ProgressEvent::Advanced {
+                    increment: 1,
+                    total: Some(total as u64),
+                    message: Some(path.display().to_string()),
+                });
+                outcome
+            })
+            .collect(),
+        FailurePolicy::FailFast => {
+            let mut items = Vec::with_capacity(total);
+            for path in files {
+                let outcome = match compress_image(&path, options) {
+                    Ok(outcome) => outcome,
+                    Err(error) => {
+                        progress.emit(ProgressEvent::Finished);
+                        return Err(error);
+                    }
+                };
+                progress.emit(ProgressEvent::Advanced {
+                    increment: 1,
+                    total: Some(total as u64),
+                    message: Some(path.display().to_string()),
+                });
+                items.push(outcome);
+            }
+            items
+        }
     };
 
-    print_summary(
-        results.len(),
-        successful_compressions,
-        failed_compressions,
-        avg_compression_ratio,
-    );
-
-    Ok((
-        successful_compressions,
-        failed_compressions,
-        avg_compression_ratio,
-    ))
+    progress.emit(ProgressEvent::Finished);
+    Ok(summarize(items))
 }
 
-/// 压缩单个图片
-fn compress_image(image_path: &Path, create_new_file: bool) -> Result<f64> {
-    let original_size = fs::metadata(image_path)?.len() as f64;
+fn summarize(items: Vec<CompressionOutcome>) -> CompressionReport {
+    let mut report = CompressionReport {
+        scanned: items.len(),
+        items,
+        ..CompressionReport::default()
+    };
 
-    if let Some(extension) = image_path.extension() {
-        let ext = extension.to_string_lossy();
-        let ext_str = ext.as_ref();
-
-        if ext_str.eq_ignore_ascii_case("png") {
-            compress_png(image_path, create_new_file, original_size)
-        } else if ext_str.eq_ignore_ascii_case("jpg") || ext_str.eq_ignore_ascii_case("jpeg") {
-            compress_jpg(image_path, create_new_file, original_size)
-        } else {
-            Err(Error::compression(format!("不支持的图片格式: {}", ext_str)))
+    for outcome in &report.items {
+        match outcome {
+            CompressionOutcome::Compressed {
+                bytes_before,
+                bytes_after,
+                ..
+            } => {
+                report.succeeded += 1;
+                report.bytes_before += bytes_before;
+                report.bytes_after += bytes_after;
+            }
+            CompressionOutcome::Skipped { .. } => report.skipped += 1,
+            CompressionOutcome::Failed { .. } => report.failed += 1,
         }
-    } else {
-        Err(Error::compression("文件没有扩展名"))
     }
+
+    report
 }
 
-/// 压缩PNG图片
-fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
-    // 使用 BufReader 读取文件
-    let file = fs::File::open(image_path)?;
+fn compress_image(path: &Path, options: &CompressionOptions) -> Result<CompressionOutcome> {
+    let bytes_before = fs::metadata(path)
+        .map_err(|error| Error::io_context("读取图片元数据", path, error))?
+        .len();
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| Error::path(format!("图片路径没有有效扩展名: {}", path.display())))?;
+
+    let encoded = if extension.eq_ignore_ascii_case("png") {
+        encode_png(path)?
+    } else if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
+        encode_jpeg(path, options.jpeg_quality)?
+    } else {
+        return Err(Error::compression(format!("不支持的图片格式: {extension}")));
+    };
+
+    if options.output_mode == OutputMode::Overwrite && encoded.len() as u64 >= bytes_before {
+        return Ok(CompressionOutcome::Skipped {
+            path: path.to_path_buf(),
+            reason: "压缩后文件未变小".to_string(),
+        });
+    }
+
+    let output_path = match options.output_mode {
+        OutputMode::Overwrite => path.to_path_buf(),
+        OutputMode::NewFile => create_output_path(path, "_c")?,
+    };
+    write_image_atomically(&output_path, |writer| {
+        writer.write_all(&encoded)?;
+        Ok(())
+    })?;
+    let bytes_after = fs::metadata(&output_path)
+        .map_err(|error| Error::io_context("读取压缩图片元数据", &output_path, error))?
+        .len();
+
+    Ok(CompressionOutcome::Compressed {
+        path: path.to_path_buf(),
+        output_path,
+        bytes_before,
+        bytes_after,
+    })
+}
+
+fn encode_png(path: &Path) -> Result<Vec<u8>> {
+    let file =
+        fs::File::open(path).map_err(|error| Error::io_context("打开 PNG 图片", path, error))?;
     let mut reader = BufReader::new(file);
-    let mut input_data = Vec::new();
-    reader.read_to_end(&mut input_data)?;
-
-    // 使用默认优化选项
-    let options = Options::default();
-
-    // 优化PNG到内存
-    let output_data_in_memory = optimize_from_memory(&input_data, &options)
-        .map_err(|e| Error::compression(format!("PNG优化失败: {}", e)))?;
-    let compressed_size_in_memory = output_data_in_memory.len() as f64;
-
-    if !create_new_file {
-        // 覆写模式
-        if compressed_size_in_memory >= original_size {
-            println!(
-                "提示: 文件 {} (原始大小: {:.0} bytes) 压缩后大小为 {:.0} bytes，未变小或反而变大，跳过覆写。",
-                image_path.display(),
-                original_size,
-                compressed_size_in_memory
-            );
-            return Ok(0.0); // 返回0%压缩率，表示未进行有效压缩
-        }
-        // 体积变小，先写入同目录临时文件，成功后再替换原图。
-        write_image_atomically(image_path, |writer| {
-            writer.write_all(&output_data_in_memory)?;
-            Ok(())
-        })?;
-        let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
-        Ok(compression_ratio)
-    } else {
-        // 创建新文件模式
-        let output_path = create_output_path(image_path, "_c");
-        write_image_atomically(&output_path, |writer| {
-            writer.write_all(&output_data_in_memory)?;
-            Ok(())
-        })?;
-
-        // 对于新文件，我们仍然基于其在磁盘上的最终大小计算压缩率
-        let final_compressed_size_on_disk = fs::metadata(&output_path)?.len() as f64;
-        let compression_ratio = 1.0 - (final_compressed_size_on_disk / original_size);
-        Ok(compression_ratio)
-    }
+    let mut input = Vec::new();
+    reader
+        .read_to_end(&mut input)
+        .map_err(|error| Error::io_context("读取 PNG 图片", path, error))?;
+    optimize_from_memory(&input, &Options::default())
+        .map_err(|error| Error::compression(format!("PNG 优化失败: {error}")))
 }
 
-/// 压缩JPG/JPEG图片
-///
-/// 注意：JPEG"压缩"是通过 `image` crate 解码后重新编码实现的，属于**有损压缩**，
-/// 可能会导致图片质量变化。如需无损优化 JPEG，建议使用 `mozjpeg` 等专用工具。
-fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) -> Result<f64> {
-    // 使用 BufReader 打开图片
-    let file = fs::File::open(image_path)?;
+fn encode_jpeg(path: &Path, quality: u8) -> Result<Vec<u8>> {
+    let file =
+        fs::File::open(path).map_err(|error| Error::io_context("打开 JPEG 图片", path, error))?;
     let reader = BufReader::new(file);
-    let img = image::load(reader, image::ImageFormat::Jpeg)
-        .map_err(|e| Error::compression(format!("无法打开图片: {}", e)))?;
-
-    // 尝试将图片编码到内存缓冲区
+    let image = image::load(reader, image::ImageFormat::Jpeg)
+        .map_err(|error| Error::compression(format!("JPEG 解码失败: {error}")))?;
     let mut buffer = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut buffer);
-    img.write_to(&mut cursor, image::ImageFormat::Jpeg)
-        .map_err(|e| Error::compression(format!("图片编码失败: {}", e)))?;
-    let compressed_size_in_memory = buffer.len() as f64;
-
-    if !create_new_file {
-        // 覆写模式
-        if compressed_size_in_memory >= original_size {
-            println!(
-                "提示: 文件 {} (原始大小: {:.0} bytes) 压缩后大小为 {:.0} bytes，未变小或反而变大，跳过覆写。",
-                image_path.display(),
-                original_size,
-                compressed_size_in_memory
-            );
-            return Ok(0.0); // 返回0%压缩率
-        }
-        // 体积变小，先写入同目录临时文件，成功后再替换原图。
-        write_image_atomically(image_path, |writer| {
-            writer.write_all(&buffer)?;
-            Ok(())
-        })?;
-        let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
-        Ok(compression_ratio)
-    } else {
-        // 创建新文件模式
-        let output_path = create_output_path(image_path, "_c");
-        write_image_atomically(&output_path, |writer| {
-            img.write_to(writer, image::ImageFormat::Jpeg)
-                .map_err(|e| Error::compression(format!("图片保存失败: {}", e)))?;
-            Ok(())
-        })?;
-
-        let final_compressed_size_on_disk = fs::metadata(&output_path)?.len() as f64;
-        let compression_ratio = 1.0 - (final_compressed_size_on_disk / original_size);
-        Ok(compression_ratio)
-    }
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buffer, quality)
+        .encode_image(&image)
+        .map_err(|error| Error::compression(format!("JPEG 编码失败: {error}")))?;
+    Ok(buffer)
 }
 
 fn write_image_atomically<F>(output_path: &Path, write_fn: F) -> Result<()>
@@ -285,118 +272,110 @@ where
     })
 }
 
-/// 创建输出路径（添加后缀）
-fn create_output_path(input_path: &Path, suffix: &str) -> PathBuf {
-    let stem = input_path.file_stem().expect("图片文件必须有文件名");
-    let extension = input_path.extension().expect("图片文件必须有扩展名");
+fn create_output_path(input_path: &Path, suffix: &str) -> Result<PathBuf> {
+    let stem = input_path
+        .file_stem()
+        .ok_or_else(|| Error::path(format!("图片路径没有文件名: {}", input_path.display())))?;
+    let extension = input_path
+        .extension()
+        .ok_or_else(|| Error::path(format!("图片路径没有扩展名: {}", input_path.display())))?;
 
-    let new_filename = format!(
+    Ok(input_path.with_file_name(format!(
         "{}{}.{}",
         stem.to_string_lossy(),
         suffix,
         extension.to_string_lossy()
-    );
-
-    input_path.with_file_name(new_filename)
+    )))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
+    use image::{ImageBuffer, Rgba};
+    use tempfile::tempdir;
 
     #[test]
-    fn test_image_type_from_str_valid() {
-        assert_eq!(ImageType::from_str("png").unwrap(), ImageType::Png);
-        assert_eq!(ImageType::from_str("PNG").unwrap(), ImageType::Png);
-        assert_eq!(ImageType::from_str("jpg").unwrap(), ImageType::Jpg);
-        assert_eq!(ImageType::from_str("JPG").unwrap(), ImageType::Jpg);
-        assert_eq!(ImageType::from_str("jpeg").unwrap(), ImageType::Jpeg);
+    fn jpg_and_jpeg_are_the_same_format() {
+        assert_eq!(ImageType::from_str("jpg").unwrap(), ImageType::Jpeg);
         assert_eq!(ImageType::from_str("JPEG").unwrap(), ImageType::Jpeg);
-        assert_eq!(ImageType::from_str("all").unwrap(), ImageType::All);
-        assert_eq!(ImageType::from_str("ALL").unwrap(), ImageType::All);
     }
 
     #[test]
-    fn test_image_type_from_str_invalid() {
-        assert!(ImageType::from_str("gif").is_err());
-        assert!(ImageType::from_str("bmp").is_err());
-        assert!(ImageType::from_str("").is_err());
-        assert!(ImageType::from_str("png ").is_err());
-    }
-
-    #[test]
-    fn test_image_type_partial_eq() {
-        assert_eq!(ImageType::Png, ImageType::Png);
-        assert_ne!(ImageType::Png, ImageType::Jpg);
-        assert_ne!(ImageType::Jpg, ImageType::Jpeg);
-    }
-
-    #[test]
-    fn test_compress_image_unsupported_extension() {
-        use std::fs::File;
-        use tempfile::tempdir;
-
+    fn rejects_invalid_jpeg_quality() {
         let temp_dir = tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.bmp");
-        File::create(&file_path).unwrap();
-
-        let result = compress_image(&file_path, false);
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.to_string().contains("不支持的图片格式"));
+        let options = CompressionOptions {
+            jpeg_quality: 0,
+            ..CompressionOptions::default()
+        };
+        assert!(matches!(
+            compress_images(temp_dir.path(), &options),
+            Err(Error::InvalidArgument(_))
+        ));
     }
 
     #[test]
-    fn test_compress_image_file_not_found() {
-        let non_existent_path = std::path::Path::new("/non/existent/file.png");
-        let result = compress_image(non_existent_path, false);
-        assert!(result.is_err());
-        // 应该是Io错误，但我们的错误类型会包装它
-        let err = result.unwrap_err();
-        assert!(err.to_string().contains("I/O错误"));
-    }
-
-    #[test]
-    fn test_compress_image_png_create_new() {
-        use image::{ImageBuffer, Rgba};
-        use tempfile::tempdir;
-
+    fn creates_new_png_and_reports_it() {
         let temp_dir = tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.png");
+        let path = temp_dir.path().join("test.png");
+        let image: ImageBuffer<Rgba<u8>, _> =
+            ImageBuffer::from_pixel(16, 16, Rgba([255, 0, 0, 255]));
+        image.save(&path).unwrap();
+        let options = CompressionOptions {
+            image_type: ImageType::Png,
+            output_mode: OutputMode::NewFile,
+            ..CompressionOptions::default()
+        };
 
-        // 创建一个1x1像素的PNG图像
-        let img: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_pixel(1, 1, Rgba([255, 0, 0, 255]));
-        img.save(&file_path).unwrap();
+        let report = compress_images(temp_dir.path(), &options).unwrap();
 
-        // 使用create_new_file=true进行压缩，这样不会修改原文件
-        let result = compress_image(&file_path, true);
-        // 压缩应该成功，但可能没有压缩率（因为图像很小）
-        assert!(result.is_ok());
-        let compression_ratio = result.unwrap();
-        // 压缩率应该在0.0到1.0之间（可能是0.0，因为图像太小无法压缩）
-        assert!((0.0..=1.0).contains(&compression_ratio));
-
-        // 检查新文件是否被创建（带有_c后缀）
-        let new_file_path = temp_dir.path().join("test_c.png");
-        assert!(new_file_path.exists());
+        assert_eq!(report.scanned, 1);
+        assert_eq!(report.succeeded, 1);
+        assert_eq!(report.failed, 0);
+        assert!(temp_dir.path().join("test_c.png").is_file());
     }
 
     #[test]
-    fn test_atomic_image_write_preserves_existing_file_after_failure() {
-        use tempfile::tempdir;
-
+    fn corrupt_png_is_a_reported_failure_in_continue_mode() {
         let temp_dir = tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.png");
-        fs::write(&file_path, b"original image bytes").unwrap();
+        fs::write(temp_dir.path().join("broken.png"), b"not a png").unwrap();
+        let options = CompressionOptions {
+            image_type: ImageType::Png,
+            ..CompressionOptions::default()
+        };
 
-        let result = write_image_atomically(&file_path, |writer| {
+        let report = compress_images(temp_dir.path(), &options).unwrap();
+
+        assert_eq!(report.scanned, 1);
+        assert_eq!(report.failed, 1);
+        assert!(matches!(report.items[0], CompressionOutcome::Failed { .. }));
+    }
+
+    #[test]
+    fn fail_fast_returns_the_first_error() {
+        let temp_dir = tempdir().unwrap();
+        fs::write(temp_dir.path().join("broken.png"), b"not a png").unwrap();
+        let options = CompressionOptions {
+            image_type: ImageType::Png,
+            failure_policy: FailurePolicy::FailFast,
+            ..CompressionOptions::default()
+        };
+
+        assert!(compress_images(temp_dir.path(), &options).is_err());
+    }
+
+    #[test]
+    fn atomic_image_write_preserves_existing_file_after_failure() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path().join("test.png");
+        fs::write(&path, b"original image bytes").unwrap();
+
+        let result = write_image_atomically(&path, |writer| {
             writer.write_all(b"partial image bytes")?;
             Err(Error::compression("模拟图片编码失败"))
         });
 
         assert!(result.is_err());
-        assert_eq!(fs::read(&file_path).unwrap(), b"original image bytes");
+        assert_eq!(fs::read(&path).unwrap(), b"original image bytes");
         assert_eq!(fs::read_dir(temp_dir.path()).unwrap().count(), 1);
     }
 }

@@ -103,10 +103,7 @@ fn test_clean_execution_no_node_modules() {
     let temp_path = temp_dir.path().to_str().unwrap();
 
     let mut cmd = Command::cargo_bin("maya").unwrap();
-    cmd.arg("clean")
-        .arg(temp_path)
-        .arg("--types")
-        .arg("n");
+    cmd.arg("clean").arg(temp_path).arg("--types").arg("n");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("已清理 0 个 node_modules 文件夹"));
@@ -116,13 +113,11 @@ fn test_clean_execution_no_node_modules() {
 #[test]
 fn test_clean_invalid_type() {
     let mut cmd = Command::cargo_bin("maya").unwrap();
-    cmd.arg("clean")
-        .arg("--types")
-        .arg("invalid")
-        .arg(".");
+    cmd.arg("clean").arg("--types").arg("invalid").arg(".");
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("不支持的清理类型"));
+        .code(2)
+        .stderr(predicate::str::contains("invalid value 'invalid'"));
 }
 
 // 测试 clean lock 子命令实际删除锁文件
@@ -215,11 +210,122 @@ fn test_optimize_alias_execution() {
     let temp_path = temp_dir.path().to_str().unwrap();
 
     let mut cmd = Command::cargo_bin("maya").unwrap();
-    cmd.arg("o")
-        .arg(temp_path)
-        .arg("-t")
-        .arg("png");
+    cmd.arg("o").arg(temp_path).arg("-t").arg("png");
     cmd.assert()
         .success()
         .stdout(predicate::str::contains("开始压缩"));
+}
+
+#[test]
+fn quiet_suppresses_success_output() {
+    use tempfile::tempdir;
+
+    let temp_dir = tempdir().unwrap();
+    let mut cmd = Command::cargo_bin("maya").unwrap();
+    cmd.args(["--quiet", "clean"])
+        .arg(temp_dir.path())
+        .args(["--types", "n"]);
+
+    cmd.assert().success().stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn no_progress_keeps_summary_but_hides_progress_events() {
+    use tempfile::tempdir;
+
+    let temp_dir = tempdir().unwrap();
+    let mut cmd = Command::cargo_bin("maya").unwrap();
+    cmd.args(["--no-progress", "optimize"])
+        .arg(temp_dir.path())
+        .args(["--types", "png"]);
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("图片处理完成"))
+        .stdout(predicate::str::contains("开始压缩图片").not());
+}
+
+#[test]
+fn corrupt_image_returns_partial_failure_exit_code() {
+    use std::fs;
+    use tempfile::tempdir;
+
+    let temp_dir = tempdir().unwrap();
+    fs::write(temp_dir.path().join("broken.png"), b"not a png").unwrap();
+    let mut cmd = Command::cargo_bin("maya").unwrap();
+    cmd.arg("optimize")
+        .arg(temp_dir.path())
+        .args(["--types", "png"]);
+
+    cmd.assert()
+        .code(3)
+        .stderr(predicate::str::contains("图片压缩部分失败"));
+}
+
+#[test]
+fn pack_accepts_explicit_project_path_and_vite_out_dir() {
+    use std::fs;
+    use tempfile::tempdir;
+
+    let temp_dir = tempdir().unwrap();
+    fs::create_dir(temp_dir.path().join("custom-build")).unwrap();
+    fs::write(temp_dir.path().join("custom-build/index.js"), "code").unwrap();
+    let mut cmd = Command::cargo_bin("maya").unwrap();
+    cmd.arg("pack")
+        .arg(temp_dir.path())
+        .args(["--type", "a", "--out-dir", "custom-build"]);
+
+    cmd.assert().success();
+    assert!(temp_dir.path().join("custom-build.zip").is_file());
+}
+
+#[test]
+fn vite_pack_without_config_returns_input_exit_code() {
+    use tempfile::tempdir;
+
+    let temp_dir = tempdir().unwrap();
+    let mut cmd = Command::cargo_bin("maya").unwrap();
+    cmd.arg("pack").arg(temp_dir.path()).args(["--type", "a"]);
+
+    cmd.assert()
+        .code(4)
+        .stderr(predicate::str::contains("未找到配置文件"));
+}
+
+#[test]
+fn optimize_new_file_flag_creates_suffixed_image() {
+    use image::{ImageBuffer, Rgba};
+    use tempfile::tempdir;
+
+    let temp_dir = tempdir().unwrap();
+    let source = temp_dir.path().join("image.png");
+    let image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_pixel(16, 16, Rgba([255, 0, 0, 255]));
+    image.save(&source).unwrap();
+
+    let mut cmd = Command::cargo_bin("maya").unwrap();
+    cmd.arg("optimize")
+        .arg(temp_dir.path())
+        .args(["--types", "png", "--new-file"]);
+
+    cmd.assert().success();
+    assert!(temp_dir.path().join("image_c.png").is_file());
+}
+
+#[test]
+fn optimize_legacy_n_value_still_creates_new_file() {
+    use image::{ImageBuffer, Rgba};
+    use tempfile::tempdir;
+
+    let temp_dir = tempdir().unwrap();
+    let source = temp_dir.path().join("legacy.png");
+    let image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_pixel(16, 16, Rgba([0, 255, 0, 255]));
+    image.save(&source).unwrap();
+
+    let mut cmd = Command::cargo_bin("maya").unwrap();
+    cmd.arg("optimize")
+        .arg(temp_dir.path())
+        .args(["--types", "png", "n"]);
+
+    cmd.assert().success();
+    assert!(temp_dir.path().join("legacy_c.png").is_file());
 }

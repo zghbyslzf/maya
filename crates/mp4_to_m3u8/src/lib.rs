@@ -3,93 +3,144 @@ use ffmpeg_sidecar::{
     download::auto_download,
     event::FfmpegEvent,
 };
-use indicatif::{ProgressBar, ProgressStyle};
 use maya_common::error::{Error, Result};
 use maya_common::file_utils::{atomic_replace_directory, find_files_by_extension};
+use maya_common::{FailurePolicy, NoopProgress, OperationWarning, ProgressEvent, ProgressSink};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 const STDERR_TAIL_LIMIT: usize = 8 * 1024;
 const DEFAULT_CONVERSION_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 
-/// mp4转m3u8功能
-///
-/// # 参数
-/// * `path` - 搜索mp4文件的目录路径
-///
-/// # 返回
-/// * `Result<(u32, u32)>` - (成功转换的文件数量, 失败的文件数量)
-pub async fn convert_mp4_to_m3u8(path: &Path) -> Result<(u32, u32)> {
-    convert_mp4_to_m3u8_with_timeout(path, DEFAULT_CONVERSION_TIMEOUT).await
+#[derive(Debug, Clone)]
+pub struct ConversionOptions {
+    pub timeout: Duration,
+    pub failure_policy: FailurePolicy,
 }
 
-/// mp4 转 m3u8，并为每个 FFmpeg 进程设置超时。
-pub async fn convert_mp4_to_m3u8_with_timeout(
+impl Default for ConversionOptions {
+    fn default() -> Self {
+        Self {
+            timeout: DEFAULT_CONVERSION_TIMEOUT,
+            failure_policy: FailurePolicy::Continue,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ConversionOutcome {
+    Converted {
+        input: PathBuf,
+        output_dir: PathBuf,
+        warnings: Vec<OperationWarning>,
+    },
+    Failed {
+        input: PathBuf,
+        error: Error,
+    },
+}
+
+#[derive(Debug, Default)]
+pub struct ConversionReport {
+    pub scanned: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+    pub warning_count: usize,
+    pub items: Vec<ConversionOutcome>,
+}
+
+pub async fn convert_mp4_to_m3u8(
     path: &Path,
-    timeout: Duration,
-) -> Result<(u32, u32)> {
-    if timeout.is_zero() {
+    options: &ConversionOptions,
+) -> Result<ConversionReport> {
+    convert_mp4_to_m3u8_with_progress(path, options, Arc::new(NoopProgress)).await
+}
+
+pub async fn convert_mp4_to_m3u8_with_progress(
+    path: &Path,
+    options: &ConversionOptions,
+    progress: Arc<dyn ProgressSink>,
+) -> Result<ConversionReport> {
+    if options.timeout.is_zero() {
         return Err(Error::invalid_argument("FFmpeg转换超时必须大于0"));
     }
 
-    // 确保FFmpeg可用，如果没有则自动下载
-    ensure_ffmpeg_available().await?;
-
-    println!("开始扫描mp4文件...");
-
-    // 收集所有mp4文件
     let mp4_files = find_files_by_extension(path, &["mp4"])?;
-
-    if mp4_files.is_empty() {
-        println!("未找到任何mp4文件");
-        return Ok((0, 0));
+    let total = mp4_files.len();
+    if total == 0 {
+        progress.emit(ProgressEvent::Started {
+            operation: "MP4 转 M3U8".to_string(),
+            total: Some(0),
+        });
+        progress.emit(ProgressEvent::Finished);
+        return Ok(ConversionReport::default());
     }
+    ensure_ffmpeg_available(progress.as_ref()).await?;
+    progress.emit(ProgressEvent::Started {
+        operation: "MP4 转 M3U8".to_string(),
+        total: Some(total as u64),
+    });
 
-    println!("找到 {} 个mp4文件", mp4_files.len());
-
-    let mut successful_conversions = 0;
-    let mut failed_conversions = 0;
-
-    for (index, mp4_file) in mp4_files.iter().enumerate() {
-        println!(
-            "\n正在处理 ({}/{}) {}",
-            index + 1,
-            mp4_files.len(),
-            mp4_file.display()
-        );
-
-        match convert_single_mp4(mp4_file, timeout).await {
-            Ok(_) => {
-                successful_conversions += 1;
-                println!("✅ 成功转换: {}", mp4_file.display());
+    let mut report = ConversionReport {
+        scanned: total,
+        ..ConversionReport::default()
+    };
+    for mp4_file in mp4_files {
+        match convert_single_mp4(&mp4_file, options.timeout, Arc::clone(&progress)).await {
+            Ok(converted) => {
+                report.succeeded += 1;
+                report.warning_count += converted.warnings.len();
+                report.items.push(ConversionOutcome::Converted {
+                    input: mp4_file.clone(),
+                    output_dir: converted.output_dir,
+                    warnings: converted.warnings,
+                });
             }
-            Err(e) => {
-                failed_conversions += 1;
-                eprintln!("❌ 转换失败 {}: {}", mp4_file.display(), e);
+            Err(error) if options.failure_policy == FailurePolicy::Continue => {
+                report.failed += 1;
+                report.items.push(ConversionOutcome::Failed {
+                    input: mp4_file.clone(),
+                    error,
+                });
+            }
+            Err(error) => {
+                progress.emit(ProgressEvent::Finished);
+                return Err(error);
             }
         }
+        progress.emit(ProgressEvent::Advanced {
+            increment: 1,
+            total: Some(total as u64),
+            message: Some(mp4_file.display().to_string()),
+        });
     }
-
-    println!("\n--- 转换总结 ---");
-    println!("总共处理文件数量: {}", mp4_files.len());
-    println!("成功转换文件数量: {}", successful_conversions);
-    println!("失败转换文件数量: {}", failed_conversions);
-    println!("--------------------");
-
-    Ok((successful_conversions, failed_conversions))
+    progress.emit(ProgressEvent::Finished);
+    Ok(report)
 }
 
 /// 转换单个mp4文件
-async fn convert_single_mp4(mp4_file: &Path, timeout: Duration) -> Result<()> {
+async fn convert_single_mp4(
+    mp4_file: &Path,
+    timeout: Duration,
+    progress: Arc<dyn ProgressSink>,
+) -> Result<ConvertedVideo> {
     let mp4_file = mp4_file.to_path_buf();
-    tokio::task::spawn_blocking(move || convert_single_mp4_blocking(&mp4_file, timeout)).await?
+    tokio::task::spawn_blocking(move || {
+        convert_single_mp4_blocking(&mp4_file, timeout, progress.as_ref())
+    })
+    .await?
 }
 
-fn convert_single_mp4_blocking(mp4_file: &Path, timeout: Duration) -> Result<()> {
+fn convert_single_mp4_blocking(
+    mp4_file: &Path,
+    timeout: Duration,
+    progress: &dyn ProgressSink,
+) -> Result<ConvertedVideo> {
     let file_stem = mp4_file
         .file_stem()
         .ok_or_else(|| Error::video_conversion("无法获取文件名"))?
@@ -100,10 +151,11 @@ fn convert_single_mp4_blocking(mp4_file: &Path, timeout: Duration) -> Result<()>
         .ok_or_else(|| Error::video_conversion("无法获取文件目录"))?
         .join(&*file_stem);
 
-    println!("🔄 开始转换...");
-
     // 获取视频时长用于计算进度
-    let duration = get_video_duration(mp4_file)?;
+    let (duration, warning) = get_video_duration(mp4_file)?;
+    let working_dir = mp4_file
+        .parent()
+        .ok_or_else(|| Error::video_conversion("无法获取文件目录"))?;
 
     // 全部输出先写入同级临时目录；只有进程和产物验证均成功后才替换旧目录。
     atomic_replace_directory(&output_dir, |staging_dir| {
@@ -119,33 +171,35 @@ fn convert_single_mp4_blocking(mp4_file: &Path, timeout: Duration) -> Result<()>
             .output(m3u8_file.to_string_lossy().as_ref())
             .overwrite();
 
-        run_ffmpeg_command(ffmpeg, duration, staging_dir, timeout)
+        run_ffmpeg_command(
+            ffmpeg,
+            duration,
+            staging_dir,
+            working_dir,
+            timeout,
+            progress,
+        )
     })?;
+    Ok(ConvertedVideo {
+        output_dir,
+        warnings: warning.into_iter().collect(),
+    })
+}
 
-    println!("📁 输出目录: {}", output_dir.display());
-
-    Ok(())
+struct ConvertedVideo {
+    output_dir: PathBuf,
+    warnings: Vec<OperationWarning>,
 }
 
 fn run_ffmpeg_command(
     mut ffmpeg: FfmpegCommand,
     duration: f64,
     output_dir: &Path,
+    working_dir: &Path,
     timeout: Duration,
+    progress: &dyn ProgressSink,
 ) -> Result<()> {
-    // 创建进度条
-    let pb = ProgressBar::new(100);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}% {msg}")
-            .expect("无效的进度条模板字符串")
-            .progress_chars("█▉▊▋▌▍▎▏  "),
-    );
-    pb.set_message("正在转换mp4到m3u8...");
-
     let command_description = format!("{ffmpeg:?}");
-    let working_dir = std::env::current_dir()
-        .map_err(|error| Error::video_conversion(format!("无法获取FFmpeg工作目录: {}", error)))?;
 
     let result = (|| {
         // 使用 ffmpeg-sidecar 构建命令并监听进度。
@@ -182,12 +236,12 @@ fn run_ffmpeg_command(
 
             match event_receiver.recv_timeout(remaining) {
                 Ok(event) => match event {
-                    FfmpegEvent::Progress(progress) => {
-                        stderr_tail.push(&progress.raw_log_message);
+                    FfmpegEvent::Progress(event_progress) => {
+                        stderr_tail.push(&event_progress.raw_log_message);
                         update_conversion_progress(
-                            &pb,
+                            progress,
                             duration,
-                            &progress.time,
+                            &event_progress.time,
                             &mut last_progress,
                         );
                     }
@@ -239,25 +293,14 @@ fn run_ffmpeg_command(
             stderr_tail.as_string(),
             output_dir,
             &command_description,
-            &working_dir,
+            working_dir,
         )
     })();
-
-    match result {
-        Ok(()) => {
-            pb.set_position(100);
-            pb.finish_with_message("✅ 转换完成");
-            Ok(())
-        }
-        Err(error) => {
-            pb.abandon_with_message("❌ 转换失败");
-            Err(error)
-        }
-    }
+    result
 }
 
 fn update_conversion_progress(
-    progress_bar: &ProgressBar,
+    progress: &dyn ProgressSink,
     duration: f64,
     time: &str,
     last_progress: &mut u64,
@@ -270,16 +313,15 @@ fn update_conversion_progress(
         };
 
         if progress_percent != *last_progress {
-            progress_bar.set_position(progress_percent);
-            progress_bar.set_message(format!(
-                "正在转换... {:.1}s{}",
+            progress.emit(ProgressEvent::Message(format!(
+                "FFmpeg 转换进度 {progress_percent}%：{:.1}s{}",
                 current_seconds,
                 if duration > 0.0 {
                     format!(" / {:.1}s", duration)
                 } else {
                     String::new()
                 }
-            ));
+            )));
             *last_progress = progress_percent;
         }
     }
@@ -294,22 +336,18 @@ fn validate_ffmpeg_completion(
     working_dir: &Path,
 ) -> Result<()> {
     if !status.success() {
-        let exit_code = status
-            .code()
-            .map(|code| code.to_string())
-            .unwrap_or_else(|| "被信号终止".to_string());
         let details = if stderr_tail.trim().is_empty() {
             "没有可用的 stderr 输出".to_string()
         } else {
             stderr_tail
         };
-        return Err(Error::video_conversion(format!(
-            "FFmpeg退出失败（命令: {}；工作目录: {}；退出码: {}），stderr末尾: {}",
-            command_description,
-            working_dir.display(),
-            exit_code,
-            details.trim()
-        )));
+        return Err(Error::command_failed(
+            "ffmpeg",
+            vec![command_description.to_string()],
+            working_dir,
+            status.code(),
+            details.trim(),
+        ));
     }
 
     if !iterator_errors.is_empty() {
@@ -418,59 +456,25 @@ impl StderrTail {
     }
 }
 
-/// 确保FFmpeg可用，如果不可用则自动下载
-async fn ensure_ffmpeg_available() -> Result<()> {
-    // 尝试检查FFmpeg是否已经可用
+/// 确保 FFmpeg 可用；下载展示由调用方通过进度事件实现。
+async fn ensure_ffmpeg_available(progress: &dyn ProgressSink) -> Result<()> {
     if ffmpeg_is_installed() {
         return Ok(());
     }
 
-    println!("🔍 FFmpeg未找到，正在自动下载...");
-
-    // 创建下载进度条
-    let pb = ProgressBar::new(100);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.blue} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}% {msg}")
-            .expect("无效的进度条模板字符串")
-            .progress_chars("█▉▊▋▌▍▎▏  "),
-    );
-    pb.set_message("正在下载FFmpeg二进制文件...");
-
-    let progress_handle = tokio::spawn({
-        let pb = pb.clone();
-        async move {
-            for i in 0..=100 {
-                pb.set_position(i);
-                tokio::time::sleep(Duration::from_millis(50)).await;
-                if i == 100 {
-                    break;
-                }
-            }
-        }
+    progress.emit(ProgressEvent::Started {
+        operation: "下载 FFmpeg".to_string(),
+        total: None,
     });
-
-    // 自动下载FFmpeg
-    let download_result = tokio::task::spawn_blocking(auto_download)
-        .await
-        .map_err(|e| Error::video_conversion(format!("FFmpeg下载任务失败: {}", e)))?;
-
-    progress_handle.abort();
-
-    match download_result {
-        Ok(_) => {
-            pb.finish_with_message("✅ FFmpeg下载完成");
-            Ok(())
-        }
-        Err(e) => {
-            pb.abandon_with_message("❌ FFmpeg下载失败");
-            Err(Error::video_conversion(format!("FFmpeg下载失败: {}", e)))
-        }
-    }
+    let download_result = tokio::task::spawn_blocking(auto_download).await;
+    progress.emit(ProgressEvent::Finished);
+    download_result
+        .map_err(|e| Error::video_conversion(format!("FFmpeg下载任务失败: {}", e)))?
+        .map_err(|e| Error::video_conversion(format!("FFmpeg下载失败: {}", e)))
 }
 
 /// 获取视频时长
-fn get_video_duration(mp4_file: &Path) -> Result<f64> {
+fn get_video_duration(mp4_file: &Path) -> Result<(f64, Option<OperationWarning>)> {
     let output = std::process::Command::new(ffmpeg_sidecar::ffprobe::ffprobe_path())
         .args([
             "-v",
@@ -491,18 +495,22 @@ fn get_video_duration(mp4_file: &Path) -> Result<f64> {
                 .trim()
                 .parse()
                 .map_err(|e| Error::video_conversion(format!("解析视频时长失败: {}", e)))?;
-            Ok(duration)
+            Ok((duration, None))
         }
-        Ok(_) => {
-            // 如果ffprobe失败，返回默认值0（将使用无进度模式）
-            println!("⚠️  无法获取视频时长，将使用简化进度显示");
-            Ok(0.0)
-        }
-        Err(_) => {
-            // 如果ffprobe不可用，返回默认值0
-            println!("⚠️  ffprobe不可用，将使用简化进度显示");
-            Ok(0.0)
-        }
+        Ok(_) => Ok((
+            0.0,
+            Some(OperationWarning::new(
+                Some(mp4_file.to_path_buf()),
+                "无法获取视频时长，将使用非确定进度",
+            )),
+        )),
+        Err(_) => Ok((
+            0.0,
+            Some(OperationWarning::new(
+                Some(mp4_file.to_path_buf()),
+                "ffprobe 不可用，将使用非确定进度",
+            )),
+        )),
     }
 }
 
@@ -646,7 +654,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.to_string().contains("退出码: 7"));
+        assert!(error.to_string().contains("退出码: Some(7)"));
         assert!(error.to_string().contains("conversion failed"));
         assert!(error.to_string().contains("ffmpeg -i input.mp4"));
         assert!(error
@@ -685,14 +693,16 @@ mod tests {
                 fake_ffmpeg_command(staging_dir, 7),
                 0.0,
                 staging_dir,
+                temp_dir.path(),
                 Duration::from_secs(10),
+                &NoopProgress,
             )
         });
 
         let error = result.unwrap_err();
         let error_message = error.to_string();
         assert!(
-            error_message.contains("退出码: 7"),
+            error_message.contains("退出码: Some(7)"),
             "实际错误: {error_message}"
         );
         assert!(
@@ -735,7 +745,9 @@ mod tests {
                 FfmpegCommand::from(command),
                 0.0,
                 staging_dir,
+                temp_dir.path(),
                 Duration::from_millis(100),
+                &NoopProgress,
             )
         });
 

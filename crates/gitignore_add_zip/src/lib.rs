@@ -1,57 +1,76 @@
 use ignore::WalkBuilder;
 use maya_common::error::{Error, Result};
+use maya_common::ArchiveReport;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
-pub fn handle_gitignore_pack() -> Result<()> {
-    // 检查当前目录下是否有.gitignore文件
-    let current_dir = std::env::current_dir()?;
-
-    if let Some(gitignore_path) = maya_common::find_file(&current_dir, ".gitignore") {
-        println!("找到.gitignore文件: {:?}", gitignore_path);
-
-        // 创建zip文件
-        let zip_path = create_zip_from_gitignore(&current_dir, &current_dir)?;
-        println!("成功打包文件到: {:?}", zip_path);
-    } else {
-        println!("没有找到.gitignore文件");
+/// 按项目根目录中的 `.gitignore` 规则创建 ZIP。
+pub fn pack_with_gitignore(project_root: &Path) -> Result<ArchiveReport> {
+    let gitignore = project_root.join(".gitignore");
+    if !gitignore.is_file() {
+        return Err(Error::config_not_found(project_root, [".gitignore"]));
     }
-    Ok(())
-}
 
-fn create_zip_from_gitignore(source_dir: &Path, dest_path: &Path) -> Result<PathBuf> {
-    let walker = WalkBuilder::new(source_dir)
+    let walker = WalkBuilder::new(project_root)
         .hidden(false)
         .git_global(false)
         .git_ignore(true)
         .require_git(false)
         .build();
-
     let mut allowed_files: HashSet<PathBuf> = HashSet::new();
 
     for entry in walker {
         let entry = entry.map_err(|error| {
             Error::path(format!(
-                "按 .gitignore 遍历目录 {} 失败: {}",
-                source_dir.display(),
-                error
+                "按 .gitignore 遍历目录 {} 失败: {error}",
+                project_root.display()
             ))
         })?;
         let path = entry.path();
-
         if path
             .components()
-            .any(|c| c == std::path::Component::Normal(".git".as_ref()))
+            .any(|component| component == Component::Normal(".git".as_ref()))
         {
             continue;
         }
-
-        allowed_files.insert(path.to_path_buf());
+        if entry
+            .file_type()
+            .is_some_and(|file_type| file_type.is_file())
+        {
+            allowed_files.insert(path.to_path_buf());
+        }
     }
 
-    let zip_path = maya_common::create_zip_archive(source_dir, dest_path, |path| {
-        path.is_file() && allowed_files.contains(path)
-    })?;
+    maya_common::create_zip_archive(project_root, project_root, |path| {
+        allowed_files.contains(path)
+    })
+}
 
-    Ok(zip_path)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn requires_gitignore() {
+        let root = tempdir().unwrap();
+        assert!(matches!(
+            pack_with_gitignore(root.path()),
+            Err(Error::ConfigNotFound { .. })
+        ));
+    }
+
+    #[test]
+    fn creates_archive_and_excludes_ignored_file() {
+        let root = tempdir().unwrap();
+        fs::write(root.path().join(".gitignore"), "ignored.txt\n").unwrap();
+        fs::write(root.path().join("kept.txt"), "kept").unwrap();
+        fs::write(root.path().join("ignored.txt"), "ignored").unwrap();
+
+        let report = pack_with_gitignore(root.path()).unwrap();
+
+        assert!(report.archive_path.is_file());
+        assert_eq!(report.files_added, 2);
+    }
 }

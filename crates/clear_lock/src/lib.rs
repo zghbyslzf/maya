@@ -1,9 +1,10 @@
+use maya_common::error::Result;
+use maya_common::file_utils::find_files;
+use maya_common::{Error, RemovalReport};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
-use maya_common::error::Result;
-use maya_common::file_utils::find_files;
 
 static LOCK_FILES: LazyLock<HashSet<&str>> = LazyLock::new(|| {
     ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
@@ -13,7 +14,7 @@ static LOCK_FILES: LazyLock<HashSet<&str>> = LazyLock::new(|| {
 });
 
 /// 清除目录中的锁文件 (package-lock.json, yarn.lock 等)
-pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> Result<usize> {
+pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> Result<RemovalReport> {
     // 使用共享的文件遍历函数查找所有文件
     let all_files = find_files(dir.as_ref(), |path| {
         // 只检查文件
@@ -29,14 +30,20 @@ pub fn clear_lock_files<P: AsRef<Path>>(dir: P) -> Result<usize> {
         }
     })?;
 
-    let mut count = 0;
+    let mut report = RemovalReport::default();
     for file_path in all_files {
-        fs::remove_file(&file_path)?;
-        count += 1;
-        println!("已删除: {}", file_path.display());
+        match fs::remove_file(&file_path) {
+            Ok(()) => report.removed.push(file_path),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                report.skipped.push(file_path);
+            }
+            Err(error) => {
+                return Err(Error::io_context("删除锁文件", file_path, error));
+            }
+        }
     }
 
-    Ok(count)
+    Ok(report)
 }
 
 #[cfg(test)]
@@ -58,9 +65,9 @@ mod tests {
         assert!(lock_path.exists());
 
         // 清除锁文件
-        let count = clear_lock_files(temp_dir.path()).unwrap();
+        let report = clear_lock_files(temp_dir.path()).unwrap();
 
-        assert_eq!(count, 1);
+        assert_eq!(report.removed_count(), 1);
         assert!(!lock_path.exists());
     }
 }
