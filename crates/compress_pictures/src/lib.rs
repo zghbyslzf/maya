@@ -1,6 +1,6 @@
 use indicatif::{ProgressBar, ProgressStyle};
 use maya_common::error::{Error, Result};
-use maya_common::file_utils::find_files_by_extension;
+use maya_common::file_utils::{atomic_write, find_files_by_extension};
 use oxipng::{optimize_from_memory, Options};
 use rayon::prelude::*;
 use std::fs;
@@ -139,7 +139,12 @@ pub fn compress_images_parallel(
         0.0
     };
 
-    print_summary(results.len(), successful_compressions, failed_compressions, avg_compression_ratio);
+    print_summary(
+        results.len(),
+        successful_compressions,
+        failed_compressions,
+        avg_compression_ratio,
+    );
 
     Ok((
         successful_compressions,
@@ -195,20 +200,20 @@ fn compress_png(image_path: &Path, create_new_file: bool, original_size: f64) ->
             );
             return Ok(0.0); // 返回0%压缩率，表示未进行有效压缩
         }
-        // 体积变小，执行覆写，使用 BufWriter
-        let file = fs::File::create(image_path)?;
-        let mut writer = BufWriter::new(file);
-        writer.write_all(&output_data_in_memory)?;
-        writer.flush()?;
+        // 体积变小，先写入同目录临时文件，成功后再替换原图。
+        write_image_atomically(image_path, |writer| {
+            writer.write_all(&output_data_in_memory)?;
+            Ok(())
+        })?;
         let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
         Ok(compression_ratio)
     } else {
         // 创建新文件模式
         let output_path = create_output_path(image_path, "_c");
-        let file = fs::File::create(&output_path)?;
-        let mut writer = BufWriter::new(file);
-        writer.write_all(&output_data_in_memory)?;
-        writer.flush()?;
+        write_image_atomically(&output_path, |writer| {
+            writer.write_all(&output_data_in_memory)?;
+            Ok(())
+        })?;
 
         // 对于新文件，我们仍然基于其在磁盘上的最终大小计算压缩率
         let final_compressed_size_on_disk = fs::metadata(&output_path)?.len() as f64;
@@ -246,21 +251,21 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
             );
             return Ok(0.0); // 返回0%压缩率
         }
-        // 体积变小，执行覆写，使用 BufWriter
-        let file = fs::File::create(image_path)?;
-        let mut writer = BufWriter::new(file);
-        writer.write_all(&buffer)?;
-        writer.flush()?;
+        // 体积变小，先写入同目录临时文件，成功后再替换原图。
+        write_image_atomically(image_path, |writer| {
+            writer.write_all(&buffer)?;
+            Ok(())
+        })?;
         let compression_ratio = 1.0 - (compressed_size_in_memory / original_size);
         Ok(compression_ratio)
     } else {
         // 创建新文件模式
         let output_path = create_output_path(image_path, "_c");
-        let file = fs::File::create(&output_path)?;
-        let mut writer = BufWriter::new(file);
-        img.write_to(&mut writer, image::ImageFormat::Jpeg)
-            .map_err(|e| Error::compression(format!("图片保存失败: {}", e)))?;
-        writer.flush()?;
+        write_image_atomically(&output_path, |writer| {
+            img.write_to(writer, image::ImageFormat::Jpeg)
+                .map_err(|e| Error::compression(format!("图片保存失败: {}", e)))?;
+            Ok(())
+        })?;
 
         let final_compressed_size_on_disk = fs::metadata(&output_path)?.len() as f64;
         let compression_ratio = 1.0 - (final_compressed_size_on_disk / original_size);
@@ -268,12 +273,22 @@ fn compress_jpg(image_path: &Path, create_new_file: bool, original_size: f64) ->
     }
 }
 
+fn write_image_atomically<F>(output_path: &Path, write_fn: F) -> Result<()>
+where
+    F: FnOnce(&mut BufWriter<&mut fs::File>) -> Result<()>,
+{
+    atomic_write(output_path, |file, _| {
+        let mut writer = BufWriter::new(file);
+        write_fn(&mut writer)?;
+        writer.flush()?;
+        Ok(())
+    })
+}
+
 /// 创建输出路径（添加后缀）
 fn create_output_path(input_path: &Path, suffix: &str) -> PathBuf {
-    let stem = input_path.file_stem()
-        .expect("图片文件必须有文件名");
-    let extension = input_path.extension()
-        .expect("图片文件必须有扩展名");
+    let stem = input_path.file_stem().expect("图片文件必须有文件名");
+    let extension = input_path.extension().expect("图片文件必须有扩展名");
 
     let new_filename = format!(
         "{}{}.{}",
@@ -365,5 +380,23 @@ mod tests {
         // 检查新文件是否被创建（带有_c后缀）
         let new_file_path = temp_dir.path().join("test_c.png");
         assert!(new_file_path.exists());
+    }
+
+    #[test]
+    fn test_atomic_image_write_preserves_existing_file_after_failure() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.png");
+        fs::write(&file_path, b"original image bytes").unwrap();
+
+        let result = write_image_atomically(&file_path, |writer| {
+            writer.write_all(b"partial image bytes")?;
+            Err(Error::compression("模拟图片编码失败"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&file_path).unwrap(), b"original image bytes");
+        assert_eq!(fs::read_dir(temp_dir.path()).unwrap().count(), 1);
     }
 }

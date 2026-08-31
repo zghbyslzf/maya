@@ -7,6 +7,10 @@ pub enum Error {
     #[error("I/O错误: {0}")]
     Io(#[from] std::io::Error),
 
+    /// 目录遍历错误（保留出错路径和底层 I/O 原因）
+    #[error("目录遍历错误: {0}")]
+    Walk(#[from] walkdir::Error),
+
     /// 路径相关错误
     #[error("路径错误: {0}")]
     Path(String),
@@ -111,4 +115,3 @@ impl From<tokio::task::JoinError> for Error {
         Self::Other(format!("任务执行错误: {}", err))
     }
 }
-

@@ -12,9 +12,10 @@ thiserror = { workspace = true }
 anyhow = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
+tempfile = { workspace = true }
 
 [features]
 default = []
 anyhow = ["dep:anyhow"]
 tokio = ["dep:tokio"]
-parallel = ["dep:rayon"] 
+parallel = ["dep:rayon"]

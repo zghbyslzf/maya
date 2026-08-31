@@ -9,3 +9,6 @@ indicatif = "0.17"
 tokio = { workspace = true, features = ["time"] }
 ffmpeg-sidecar = "2.0.6"
 maya_common = { workspace = true, features = ["anyhow", "tokio"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

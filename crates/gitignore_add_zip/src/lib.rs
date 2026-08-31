@@ -1,7 +1,7 @@
 use ignore::WalkBuilder;
+use maya_common::error::{Error, Result};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use maya_common::error::Result;
 
 pub fn handle_gitignore_pack() -> Result<()> {
     // 检查当前目录下是否有.gitignore文件
@@ -19,10 +19,7 @@ pub fn handle_gitignore_pack() -> Result<()> {
     Ok(())
 }
 
-fn create_zip_from_gitignore(
-    source_dir: &Path,
-    dest_path: &Path,
-) -> Result<PathBuf> {
+fn create_zip_from_gitignore(source_dir: &Path, dest_path: &Path) -> Result<PathBuf> {
     let walker = WalkBuilder::new(source_dir)
         .hidden(false)
         .git_global(false)
@@ -32,10 +29,20 @@ fn create_zip_from_gitignore(
 
     let mut allowed_files: HashSet<PathBuf> = HashSet::new();
 
-    for entry in walker.flatten() {
+    for entry in walker {
+        let entry = entry.map_err(|error| {
+            Error::path(format!(
+                "按 .gitignore 遍历目录 {} 失败: {}",
+                source_dir.display(),
+                error
+            ))
+        })?;
         let path = entry.path();
 
-        if path.components().any(|c| c == std::path::Component::Normal(".git".as_ref())) {
+        if path
+            .components()
+            .any(|c| c == std::path::Component::Normal(".git".as_ref()))
+        {
             continue;
         }
 

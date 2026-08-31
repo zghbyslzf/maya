@@ -1211,6 +1211,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "rayon",
+ "tempfile",
  "thiserror",
  "tokio",
  "walkdir",
@@ -1267,6 +1268,7 @@ dependencies = [
  "ffmpeg-sidecar",
  "indicatif",
  "maya_common",
+ "tempfile",
  "tokio",
 ]
 
