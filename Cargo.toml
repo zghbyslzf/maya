@@ -45,6 +45,7 @@ tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros"] }
 anyhow = "1.0"
 thiserror = "1.0"
 rayon = "1.8"
+tempfile = "3.10"
 
 [dependencies]
 clap = { workspace = true }
@@ -61,7 +62,7 @@ tokio = { workspace = true }
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.0"
-tempfile = "3.10"
+tempfile = { workspace = true }
 
 
 

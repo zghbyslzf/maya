@@ -9,4 +9,4 @@ description = "清理项目中的锁文件"
 maya_common = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.5.0"
+tempfile = { workspace = true }

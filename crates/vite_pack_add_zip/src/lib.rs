@@ -1,17 +1,18 @@
+use maya_common::error::Result;
+use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
-use maya_common::error::Result;
-use regex::Regex;
 
 static OUT_DIR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(outDir\s*[:=]\s*['"]?)([^,'"}\s]+)['"]?"#).unwrap()
+    Regex::new(r#"(outDir\s*[:=]\s*['"]?)([^,'"}\s]+)['"]?"#).expect("OUT_DIR_RE 正则编译失败")
 });
 static BUILD_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?s)build\s*:\s*\{.*?outDir\s*[:=]\s*['"]?([^'"},]+)"#).unwrap()
+    Regex::new(r#"(?s)build\s*:\s*\{.*?outDir\s*[:=]\s*['"]?([^'"},]+)"#)
+        .expect("BUILD_BLOCK_RE 正则编译失败")
 });
 static NESTED_OUT_DIR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"outDir\s*[:=]\s*['"]?([^,'"}\s]+)['"]?"#).unwrap()
+    Regex::new(r#"outDir\s*[:=]\s*['"]?([^,'"}\s]+)['"]?"#).expect("NESTED_OUT_DIR_RE 正则编译失败")
 });
 
 /// Vite打包模块，负责查找Vite配置并将输出目录打包为zip
@@ -47,7 +48,7 @@ pub fn handle_vite_pack() -> Result<()> {
 fn find_vite_config() -> Option<PathBuf> {
     let current_dir = std::env::current_dir().ok()?;
     println!("当前目录: {:?}", current_dir);
-    
+
     // 使用共享库的find_file函数
     if let Some(js_config) = maya_common::find_file(&current_dir, "vite.config.js") {
         println!("找到vite.config.js: {:?}", js_config);
@@ -98,9 +99,9 @@ fn create_zip(source_dir: &Path, dest_path: &Path) -> Result<PathBuf> {
     let zip_path = maya_common::create_zip_archive(
         source_dir,
         dest_path,
-        |path| path.is_file() // 包含所有文件
+        |path| path.is_file(), // 包含所有文件
     )?;
-    
+
     println!("成功打包到: {:?}", zip_path);
     Ok(zip_path)
-} 
+}

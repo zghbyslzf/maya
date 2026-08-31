@@ -2,6 +2,7 @@
 name = "compress_pictures"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 oxipng = "9.1.5"
@@ -11,4 +12,4 @@ maya_common = { workspace = true, features = ["parallel"] }
 rayon = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.10"
+tempfile = { workspace = true }
