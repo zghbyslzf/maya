@@ -1,7 +1,7 @@
 use crate::cli::{FailureMode, OptimizeType};
 use crate::presenter::Presenter;
-use compress_pictures::{CompressionOptions, ImageType, OutputMode};
-use maya_common::error::{Error, Result};
+use maya_core::{Error, Result};
+use maya_media::image::{CompressionOptions, ImageType, OutputMode};
 use std::path::Path;
 
 pub fn handle_optimize_ops(
@@ -42,7 +42,7 @@ pub fn handle_optimize_ops(
         jpeg_quality,
         failure_policy: failure_policy.into(),
     };
-    let report = compress_pictures::compress_images_with_progress(path, &options, presenter)?;
+    let report = maya_media::image::compress_images_with_progress(path, &options, presenter)?;
     presenter.compression(&report);
     if report.failed > 0 {
         return Err(Error::partial_failure(

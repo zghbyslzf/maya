@@ -1,8 +1,7 @@
 use crate::cli::{FailureMode, MediaFormat};
 use crate::presenter::Presenter;
-use maya_common::error::{Error, Result};
-use maya_common::ProgressSink;
-use mp4_to_m3u8::ConversionOptions;
+use maya_core::{Error, ProgressSink, Result};
+use maya_media::video::ConversionOptions;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -20,7 +19,8 @@ pub async fn handle_transform_ops(
         ..ConversionOptions::default()
     };
     let progress: Arc<dyn ProgressSink> = presenter.clone();
-    let report = mp4_to_m3u8::convert_mp4_to_m3u8_with_progress(path, &options, progress).await?;
+    let report =
+        maya_media::video::convert_mp4_to_m3u8_with_progress(path, &options, progress).await?;
     presenter.conversion(&report);
     if report.failed > 0 {
         return Err(Error::partial_failure(

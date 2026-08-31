@@ -1,0 +1,9 @@
+[package]
+name = "maya-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Maya 稳定领域类型、错误、报告与执行策略"
+
+[dependencies]
+thiserror = { workspace = true }

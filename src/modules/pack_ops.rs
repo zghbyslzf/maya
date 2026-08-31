@@ -1,8 +1,8 @@
 use crate::cli::PackMode;
 use crate::presenter::Presenter;
-use maya_common::error::{Error, Result};
+use maya_core::{Error, Result};
+use maya_fs::VitePackOptions;
 use std::path::{Path, PathBuf};
-use vite_pack_add_zip::VitePackOptions;
 
 pub fn handle_pack_ops(
     pack_type: PackMode,
@@ -17,9 +17,9 @@ pub fn handle_pack_ops(
                     "--out-dir 只能与 Vite 打包方式 a/vite 一起使用",
                 ));
             }
-            gitignore_add_zip::pack_with_gitignore(path)?
+            maya_fs::pack_with_gitignore(path)?
         }
-        PackMode::Vite => vite_pack_add_zip::pack_vite(path, &VitePackOptions { out_dir })?,
+        PackMode::Vite => maya_fs::pack_vite(path, &VitePackOptions { out_dir })?,
     };
     presenter.archive(&report);
     Ok(())

@@ -1,7 +1,7 @@
-use compress_pictures::{CompressionOutcome, CompressionReport};
-use git_add_commit_push::GitOutcome;
-use maya_common::{ArchiveReport, ProgressEvent, ProgressSink, RemovalReport};
-use mp4_to_m3u8::{ConversionOutcome, ConversionReport};
+use maya_core::{ArchiveReport, ProgressEvent, ProgressSink, RemovalReport};
+use maya_git::GitOutcome;
+use maya_media::image::{CompressionOutcome, CompressionReport};
+use maya_media::video::{ConversionOutcome, ConversionReport};
 use std::sync::Mutex;
 
 #[derive(Debug, Default)]

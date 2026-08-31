@@ -153,7 +153,7 @@ pub enum FailureMode {
     FailFast,
 }
 
-impl From<FailureMode> for maya_common::FailurePolicy {
+impl From<FailureMode> for maya_core::FailurePolicy {
     fn from(value: FailureMode) -> Self {
         match value {
             FailureMode::Continue => Self::Continue,

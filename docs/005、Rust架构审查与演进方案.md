@@ -370,15 +370,25 @@ pub enum FailurePolicy {
 
 `Continue` 不等于忽略失败：它应完成其余项目、返回完整报告，并由 CLI 根据 failed 数量输出非零退出码。后续可在此基础上增加 `--json`，让 CI 能读取每个项目的结果。
 
-## 6. P2：收敛 workspace，而不是继续增加微型 crate
+## 6. P2：收敛 workspace，而不是继续增加微型 crate（已完成）
 
-### 6.1 当前边界问题
+**完成摘要（2026-08-31）**
+
+- workspace 已从 8 个命令型 crate 收敛为 4 个稳定能力 crate：`maya-core`、`maya-fs`、`maya-media`、`maya-git`；根 CLI 的命令、参数、别名、输出与退出语义保持兼容；
+- `maya-core` 只保留错误、执行策略、进度边界、报告和 warning 等稳定领域类型，直接依赖仅有 `thiserror`，不再通过 feature 引入 Tokio、Anyhow 或 Rayon；
+- 扫描、原子文件/目录替换、清理、Gitignore/Vite 归档已统一进入 `maya-fs`；Git 工作流与 `ProcessRunner` 进入 `maya-git`；图片与视频能力统一进入 `maya-media`；
+- 媒体内部已按职责拆分：图片采用 `model / codec / orchestration`，视频采用 `model / probe / ffmpeg / orchestration`，外部仍通过稳定的 `image`、`video` 模块调用；
+- 已删除 `maya_common`、6 个命令型微型 crate，以及未使用的并行扫描、通用名称扫描、空目录删除、可选 feature 和 Anyhow 转换；
+- `cargo tree` 与 `cargo metadata` 已确认依赖方向为 `CLI → media/git/fs → core`，其中 `media → fs → core`，不存在反向依赖或旧 workspace 成员；
+- 已通过 `cargo test --workspace`（57 个测试）、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo build --release --locked`、`cargo fmt --all` 和 `git diff --check`。
+
+### 6.1 当前边界问题（已完成）
 
 当前 8 个 crate 多数按命令名拆分，其中 `clear_node_modules`、`clear_lock`、`gitignore_add_zip`、`git_add_commit_push` 的实现较小。每增加一个相似命令，通常要同步增加 crate、manifest、workspace dependency、根依赖和 dispatcher。
 
 另一边，`maya_common` 同时容纳错误、扫描、查找、删除空目录和 ZIP 等能力，名称无法说明依赖方向，容易逐渐成为“什么都能放”的公共 crate。当前还存在未被实际调用的公共 API/feature，例如并行查找、空目录删除以及部分错误转换。
 
-### 6.2 建议目标结构
+### 6.2 建议目标结构（已完成）
 
 ```text
 maya-cli
@@ -403,7 +413,7 @@ CLI 展示层  →  用例/领域层  →  文件系统与外部进程边界
 
 领域层不直接打印、不读取 `current_dir()`，基础设施层不决定面向用户的文案。
 
-### 6.3 渐进迁移原则
+### 6.3 渐进迁移原则（已完成）
 
 - 先调整 API 和测试，再移动文件或合并 crate；
 - 合并过程中保留现有 CLI 命令和别名；
@@ -540,13 +550,13 @@ cargo build --release --locked
 - [x] 结构化错误、失败策略和退出码；
 - [x] 增加 `--quiet`、`--no-progress`，JSON 可随后增量加入。
 
-### 阶段 2：整理 workspace（预计 3～5 天）
+### 阶段 2：整理 workspace（已完成）
 
-- 将小型文件操作 crate 收敛到 `maya-fs`；
-- 建立轻量 `maya-core`，只保留稳定领域类型；
-- 图片与视频归入 `maya-media` 或保持两个 crate 但统一 API 风格；
-- 删除未使用公共 API 和 feature；
-- 拆分大文件内部模块，保持外部命令兼容。
+- [x] 将小型文件操作 crate 收敛到 `maya-fs`；
+- [x] 建立轻量 `maya-core`，只保留稳定领域类型；
+- [x] 图片与视频归入 `maya-media` 并统一 API 风格；
+- [x] 删除未使用公共 API 和 feature；
+- [x] 拆分大文件内部模块，保持外部命令兼容。
 
 ### 阶段 3：发布可靠性（预计 1～3 天）
 

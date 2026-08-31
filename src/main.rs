@@ -1,6 +1,6 @@
 use clap::Parser;
 use cli::{Cli, Command};
-use maya_common::error::Result;
+use maya_core::Result;
 use presenter::Presenter;
 use std::sync::Arc;
 
