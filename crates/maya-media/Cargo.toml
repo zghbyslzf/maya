@@ -1,17 +1,20 @@
 [package]
 name = "maya-media"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+publish = false
 description = "Maya 图片压缩与视频转换能力"
 
 [dependencies]
 maya-core = { workspace = true }
 maya-fs = { workspace = true }
-ffmpeg-sidecar = "2.0.6"
+ffmpeg-sidecar = { version = "2.0.6", default-features = false }
 image = "0.25.6"
 oxipng = "9.1.5"
 rayon = { workspace = true }
+sha2 = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 
 [dev-dependencies]

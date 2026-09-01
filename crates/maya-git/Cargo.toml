@@ -1,8 +1,10 @@
 [package]
 name = "maya-git"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+publish = false
 description = "Maya Git 仓库操作与进程执行边界"
 
 [dependencies]

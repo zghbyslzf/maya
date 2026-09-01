@@ -19,7 +19,13 @@ pub fn handle_pack_ops(
             }
             maya_fs::pack_with_gitignore(path)?
         }
-        PackMode::Vite => maya_fs::pack_vite(path, &VitePackOptions { out_dir })?,
+        PackMode::Vite => maya_fs::pack_vite(
+            path,
+            &VitePackOptions {
+                out_dir,
+                ..VitePackOptions::default()
+            },
+        )?,
     };
     presenter.archive(&report);
     Ok(())

@@ -1,8 +1,10 @@
 [package]
 name = "maya-core"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+publish = false
 description = "Maya 稳定领域类型、错误、报告与执行策略"
 
 [dependencies]

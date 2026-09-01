@@ -1,29 +1,27 @@
 {
-  "name":  "maya-cli-rs",
-  "version":  "0.1.51",
-  "description":  "A Rust-based package",
-  "main":  "maya.js",
-  "types":  "maya.d.ts",
-  "bin":  {
-        "maya":  "./release/maya.exe"
-      },
-  "files":  [
-          "release"
-        ],
-  "repository":  {
-             "type":  "git",
-             "url":  "git+https://github.com/zghbyslzf/maya.git"
-           },
-  "scripts":  {
-          "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
-        },
-  "keywords":  [
-
-         ],
-  "author":  "Maya \u003czghbyslzf@163.com\u003e (https://github.com/zghbyslzf)",
-  "license":  "MIT",
-  "bugs":  {
-         "url":  "https://github.com/zghbyslzf/maya/issues"
-       },
-  "homepage":  "https://github.com/zghbyslzf/maya#readme"
+  "name": "maya-cli-rs",
+  "version": "0.1.55",
+  "description": "Windows 平台的项目清理、归档、图片优化和视频转换 CLI",
+  "bin": {
+    "maya": "./release/maya.exe"
+  },
+  "files": [
+    "release"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zghbyslzf/maya.git"
+  },
+  "keywords": [
+    "cli",
+    "rust",
+    "ffmpeg",
+    "windows"
+  ],
+  "author": "Maya <zghbyslzf@163.com> (https://github.com/zghbyslzf)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/zghbyslzf/maya/issues"
+  },
+  "homepage": "https://github.com/zghbyslzf/maya#readme"
 }

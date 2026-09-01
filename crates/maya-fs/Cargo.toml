@@ -1,8 +1,10 @@
 [package]
 name = "maya-fs"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+publish = false
 description = "Maya 文件扫描、清理、归档与原子 I/O 能力"
 
 [dependencies]

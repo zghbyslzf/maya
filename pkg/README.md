@@ -1,38 +1,54 @@
-## 1. 安装
+# Maya CLI
 
-```
-npm i maya-cli-rs -g
-```
+Maya 是仅支持 Windows 的项目维护工具，提供目录清理、Git 操作、归档、图片压缩和 MP4 转 M3U8 能力。
 
-> 注意：暂时只支持 windows 系统
+## 安装
 
-## 2. 使用
-
-```bash
-
-maya -c n # 清除node_modules
-maya -c lock # 清除package-lock.json, yarn.lock, pnpm-lock.yaml
-maya -g m # 会在当前目录下面执行 git add . && git commit -m 'update' && git push
-maya -p a # 会检测vite的outDir配置，然后把对应的文件夹打包成zip
-maya -p g # 会忽略当前目录下的.gitignore文件中定义的文件和文件夹，把当前目录下其它所有的文件和文件夹打包成zip文件
+```powershell
+npm install --global maya-cli-rs
 ```
 
-```bash
-maya -o all # 会把当前目录下面png，jpg，jpeg这三种格式的所以的图片，在保证质量的前提下压缩体积，默认复写模式
-maya -o n all # 添加 n，从复写模式改成新文件模式
-maya -o png # 只压缩png图片
-maya -o jpg # 只压缩jpg图片
-maya -o jpeg # 只压缩jpeg图片
+NPM 包固定携带经过 SHA-256 校验的 FFmpeg 7.1.1 与 FFprobe，因此视频转换无需联网下载或手动安装。若二进制缺失或校验失败，命令会以非零退出码失败并提示重新安装。
 
+## 使用
+
+```powershell
+# 清理；n 是 node_modules 的兼容值别名
+maya clean . --types n
+maya clean . --types lock
+
+# Git add、commit、push；m 是 add-commit-push 的兼容值别名
+maya git . --ops m --message "feat: update"
+
+# 按 .gitignore 规则归档，或归档 Vite 输出目录
+maya pack . --type g
+maya pack . --type a
+maya pack C:\project --type a --out-dir dist
+
+# 图片压缩
+maya optimize . --types all
+maya optimize . --types png jpeg --new-file --jpeg-quality 85
+maya optimize . --types all --failure-policy fail-fast
+
+# 视频转换
+maya transform . --types mp4 m3u8
+maya transform C:\videos --types mp4 m3u8 --failure-policy continue
 ```
 
-```bash
-maya -t mp4 m3u8 # 会把当前目录下面所有的mp4视频转换成m3u8格式，转换后的文件会放在以原视频名称命名的文件夹中
+路径参数均可省略，默认值为当前目录 `.`。命令名仍支持 `c/g/p/o/t` 别名，值别名仍支持 `n/m/g/a`；推荐文档中的完整子命令形式。
+
+## 全局输出选项
+
+```powershell
+maya --quiet clean . --types lock
+maya --no-progress optimize . --types all
 ```
 
-## 3. 特性
+- `--quiet`：不输出非错误信息；
+- `--no-progress`：保留结果摘要，但禁用长任务进度输出。
 
-- ✅ **自动 FFmpeg 下载**: 首次使用时会自动下载 FFmpeg，无需手动安装
-- ✅ **实时进度显示**: 下载和转换过程都有详细的百分比进度条
-- ✅ **智能输出**: 转换后的文件自动放在以原视频名称命名的文件夹中
-- ✅ **批量处理**: 支持同时转换多个 mp4 文件
+使用 `maya --help` 或 `maya <子命令> --help` 查看完整参数。
+
+## FFmpeg 分发说明
+
+发布包内的 `maya.exe`、`ffmpeg.exe` 和 `ffprobe.exe` 位于同一目录。项目发布流程会在复制前后校验固定 SHA-256，Maya 在首次处理视频前会再次校验；校验失败不会执行不可信的媒体工具。

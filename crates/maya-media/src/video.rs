@@ -1,3 +1,4 @@
+mod binaries;
 mod ffmpeg;
 mod model;
 mod probe;
@@ -7,10 +8,7 @@ pub use model::{ConversionOptions, ConversionOutcome, ConversionReport};
 use ffmpeg::run_ffmpeg_command;
 #[cfg(test)]
 use ffmpeg::{validate_ffmpeg_completion, validate_hls_output, StderrTail};
-use ffmpeg_sidecar::{
-    command::{ffmpeg_is_installed, FfmpegCommand},
-    download::auto_download,
-};
+use ffmpeg_sidecar::command::FfmpegCommand;
 use maya_core::{Error, FailurePolicy, NoopProgress, ProgressEvent, ProgressSink, Result};
 use maya_fs::{atomic_replace_directory, find_files_by_extension};
 use model::ConvertedVideo;
@@ -146,18 +144,13 @@ fn convert_single_mp4_blocking(
 }
 
 async fn ensure_ffmpeg_available(progress: &dyn ProgressSink) -> Result<()> {
-    if ffmpeg_is_installed() {
-        return Ok(());
-    }
     progress.emit(ProgressEvent::Started {
-        operation: "下载 FFmpeg".to_string(),
+        operation: "校验 FFmpeg 与 FFprobe".to_string(),
         total: None,
     });
-    let result = tokio::task::spawn_blocking(auto_download).await;
+    let result = tokio::task::spawn_blocking(binaries::verify_bundled_tools).await;
     progress.emit(ProgressEvent::Finished);
-    result
-        .map_err(|error| Error::video_conversion(format!("FFmpeg下载任务失败: {error}")))?
-        .map_err(|error| Error::video_conversion(format!("FFmpeg下载失败: {error}")))
+    result.map_err(|error| Error::video_conversion(format!("FFmpeg校验任务失败: {error}")))?
 }
 
 #[cfg(test)]

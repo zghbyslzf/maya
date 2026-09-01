@@ -1,14 +1,14 @@
 # Maya Rust 架构审查与演进方案
 
 > 审查日期：2026-08-31  
-> 审查范围：根 CLI、8 个 workspace crate、公共错误与文件工具、测试、Cargo/NPM 发布流程  
+> 审查范围：审查时的根 CLI、8 个 workspace crate、公共错误与文件工具、测试、Cargo/NPM 发布流程（当前已演进为 4 个能力 crate）
 > 目标：提高项目的可理解性、可扩展性、复用性、鲁棒性和可测试性，同时避免与当前规模不匹配的过度设计
 
 ## 1. 总体结论
 
 当前项目**有明确的架构优化空间**，但不需要推倒重写。
 
-项目已经形成“根 CLI 负责分发、各 crate 承担具体能力、`maya_common` 提供公共功能”的基本结构；`cargo test` 和严格 Clippy 也能通过。这些是良好的演进基础。当前的主要问题不是 Rust 语法或性能，而是几个边界没有被清晰表达：
+审查时项目已经形成“根 CLI 负责分发、各 crate 承担具体能力、`maya_common` 提供公共功能”的基本结构；`cargo test` 和严格 Clippy 也能通过。这些是良好的演进基础。审查时的主要问题不是 Rust 语法或性能，而是几个边界没有被清晰表达：
 
 1. 文件系统和外部进程的失败可能被静默忽略或误判为成功；
 2. 业务库同时负责执行、打印和进度条，难以复用和测试；
@@ -39,7 +39,7 @@
 | `cargo package -p maya --allow-dirty --no-verify --registry crates-io` | 未通过 | 内部 crate 无法从 registry 解析，根包元数据也不完整 |
 | `npm pack --dry-run --json` | 通过 | 压缩包约 66 MB，解压约 179 MB，主要来自 FFmpeg/FFprobe |
 
-P0 完成后的验证基线：`cargo test --workspace` 共 47 个测试通过，严格 Clippy 与 `cargo build --release --locked` 均通过；本次修改涉及的 Rust 文件已通过 `rustfmt --check`。全仓库 `cargo fmt --all -- --check` 仍受 P0 范围外的历史格式差异影响，留待阶段 3 统一清理。
+P0 完成后的验证基线：`cargo test --workspace` 共 47 个测试通过，严格 Clippy 与 `cargo build --release --locked` 均通过；当时全仓库 `cargo fmt --all -- --check` 仍受 P0 范围外的历史格式差异影响。该格式基线已在阶段 3 整理完成并纳入 `cargo make verify`。
 
 这里的“测试通过”只代表已有测试覆盖的行为正确，不代表关键失败路径已经得到验证。后文列出的嵌套目录删除问题已可在当前实现中稳定复现。
 
@@ -186,7 +186,7 @@ node_modules/
 - 所有业务入口显式接收路径，业务 crate 已移除终端输出、具体进度条和全局当前目录读取；
 - 新增带操作/路径的 I/O 错误、外部命令错误、配置边界错误、部分失败错误和稳定退出码；参数错误为 2、部分失败为 3、路径/配置错误为 4、外部命令错误为 5；
 - Vite 打包明确只支持静态字符串 `build.outDir`，动态配置会被拒绝并可用 `--out-dir` 覆盖；Git 使用暂存区 diff 的退出状态判断是否有变更，不再读取英文错误文案；
-- 已通过 `cargo test --workspace`（63 个测试）、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo build --release --locked` 和 `git diff --check`；业务 crate 副作用扫描无命中。
+- P1 完成时已通过 workspace 测试、严格 Clippy、locked release build 和 `git diff --check`；业务 crate 副作用扫描无命中。当前全部演进项完成后的 workspace 测试总数为 59 个。
 
 ### 5.1 业务库不直接负责终端展示（已完成）
 
@@ -423,15 +423,23 @@ CLI 展示层  →  用例/领域层  →  文件系统与外部进程边界
 - `mp4_to_m3u8` 可按 `ffmpeg/probe/converter/progress` 拆内部模块；
 - 模块化优先于创建新 crate：只有需要独立依赖、独立测试边界或明确复用时才拆 crate。
 
-## 7. 文件扫描、归档与压缩的复用优化
+## 7. 文件扫描、归档与压缩的复用优化（已完成）
 
-### 7.1 避免重复扫描和 TOCTOU
+**完成摘要（2026-09-01）**
+
+- 图片和视频业务用例各自拥有唯一一次扫描，扫描结果直接交给执行阶段，最终由 typed report 汇总；CLI 不再预扫描；
+- Gitignore 归档已从“收集 `HashSet` 后再次遍历”改为单次 walker 生成归档计划，ZIP 写入只消费该计划；源文件在计划与写入之间变化会明确失败，原有 ZIP 仍由原子写入保护；
+- 新增 `ArchiveOptions`，显式表达空目录、符号链接和 metadata 策略；默认忽略空目录、跳过符号链接、不保留 metadata，也可选择保留空目录；
+- 归档条目统一要求有效 UTF-8 相对路径，`strip_prefix` 和路径编码错误均显式返回；输出 ZIP 使用完整路径排除，特殊字符/空格路径和空目录策略已覆盖测试；
+- FFmpeg 下载模拟进度已随运行时下载策略一并删除；随包二进制只显示总量未知的校验阶段，转换进度来自 FFmpeg 的真实时间事件。
+
+### 7.1 避免重复扫描和 TOCTOU（已完成）
 
 图片命令在 dispatcher 中先扫描统计，压缩 crate 内又扫描一次；Gitignore 打包先构建完整 `HashSet<PathBuf>`，归档函数再遍历一次。除了性能浪费，文件可能在两次扫描之间发生变化，造成统计和实际操作不一致。
 
 建议让业务用例拥有一次完整扫描，并把 entry stream 直接交给执行器；最终由 Report 提供 scanned/succeeded/skipped 数据。归档构建器也应接收 entry iterator 或明确的归档计划，避免再次遍历。
 
-### 7.2 归档 API 应表达策略与结果
+### 7.2 归档 API 应表达策略与结果（已完成）
 
 当前 ZIP 实现还存在以下隐患：
 
@@ -443,7 +451,7 @@ CLI 展示层  →  用例/领域层  →  文件系统与外部进程边界
 
 建议引入 `ArchiveOptions` 和 `ArchiveReport`，明确路径编码、符号链接、空目录、metadata、忽略规则及失败策略。排除输出文件时应比较规范化后的完整路径，而不是仅比较文件名。
 
-### 7.3 进度必须来自真实工作量
+### 7.3 进度必须来自真实工作量（已完成）
 
 FFmpeg 下载目前使用固定时间推进到 100% 的模拟进度。网络慢时进度会在 100% 停留，网络快时又会延迟完成，反而降低可信度。
 
@@ -451,9 +459,9 @@ FFmpeg 下载目前使用固定时间推进到 100% 的模拟进度。网络慢�
 - 能获得 Content-Length 和下载字节时才使用确定进度；
 - 进度显示属于 CLI presenter，不改变下载或转换结果。
 
-## 8. 测试与可观测性方案
+## 8. 测试与可观测性方案（已完成）
 
-### 8.1 建议的分层测试
+### 8.1 建议的分层测试（已完成）
 
 | 层级 | 关注点 | 代表用例 |
 | --- | --- | --- |
@@ -474,9 +482,11 @@ FFmpeg 下载目前使用固定时间推进到 100% 的模拟进度。网络慢�
 7. Git 使用本地 fake remote 或假 runner，不访问公网；
 8. 批处理中部分失败时的报告与退出码。
 
-### 8.2 最小质量门禁
+上述优先回归场景现均已有对应测试：文件系统测试覆盖嵌套/同级目标、遍历错误、原子文件与目录替换、归档计划失效和特殊路径；外部进程测试覆盖 FFmpeg 非零退出、超时、残缺产物及 Git 假 runner；CLI 集成测试覆盖参数、quiet/no-progress、显式路径和部分失败退出码；发布脚本覆盖实际 release 二进制和 NPM dry-run 内容。所有测试均为本地确定性测试，不访问 Git remote 或 FFmpeg 下载网络。
 
-项目目前没有 CI/CD。无论使用 CI 还是 `cargo-make`，都应先提供一条本地可重复的 verify 任务：
+### 8.2 最小质量门禁（已完成）
+
+项目目前没有 CI/CD，因此已使用 `cargo-make` 提供本地可重复的质量门禁：
 
 ```text
 cargo fmt --all -- --check
@@ -485,13 +495,13 @@ cargo test --workspace
 cargo build --release --locked
 ```
 
-当前格式检查尚未通过，应先一次性整理历史格式，再启用门禁，避免把无关格式变化混入功能提交。
+`cargo make verify` 按顺序执行上述四项，并额外检查所有 Cargo package 的统一版本、`publish = false` 和 FFmpeg SHA-256 清单。该任务只做检查，不递增或同步版本、不组装 NPM 包，也不执行发布。格式基线已经整理并纳入门禁。
 
-## 9. 发布流程与分发策略
+## 9. 发布流程与分发策略（已完成）
 
-### 9.1 单一版本源
+### 9.1 单一版本源（已完成）
 
-当前根 `Cargo.toml` 为 `0.1.55`，`pkg/package.json` 为 `0.1.51`；构建流程在构建前修改 Cargo 版本，NPM 阶段又单独递增版本。构建失败也可能留下已修改文件。
+审查时根 `Cargo.toml` 为 `0.1.55`，`pkg/package.json` 为 `0.1.51`；构建流程在构建前修改 Cargo 版本，NPM 阶段又单独递增版本。构建失败也可能留下已修改文件。
 
 建议：
 
@@ -501,9 +511,17 @@ cargo build --release --locked
 - 先完成 verify，再计算并一次性写入版本；
 - 发布失败可回滚，或只允许从明确的 release commit/tag 发布。
 
-### 9.2 明确 Cargo 发布意图
+**实施结果（2026-09-01）**
 
-根包执行 `cargo package` 时，内部 crate 无法从 crates.io 解析，同时根包缺少 description、license、repository 等 package metadata。
+- `[workspace.package].version = "0.1.55"` 是唯一版本源，根 binary 和 4 个成员 crate 均使用 `version.workspace = true`；
+- workspace 内部 path dependency 不再重复声明版本；
+- `scripts/sync-package-version.ps1` 从 `cargo metadata` 获取根 package 版本，并仅同步 `pkg/package.json` 的 version 字段，不自行递增；
+- 普通 `cargo make build` 和 `cargo make verify` 均不修改版本，只有显式 `cargo make package` 在 verify 通过后同步 NPM 版本；
+- `cargo make package` 冒烟测试会再次断言 Cargo/NPM 版本一致。本次验证二者均为 `0.1.55`。
+
+### 9.2 明确 Cargo 发布意图（已完成）
+
+审查时根包执行 `cargo package` 时，内部 crate 无法从 crates.io 解析，同时根包缺少 description、license、repository 等 package metadata。
 
 如果项目只通过 NPM 分发：
 
@@ -516,20 +534,40 @@ cargo build --release --locked
 - 明确内部 crate 的独立版本与发布顺序；
 - 不能只依赖本地 path 解析。
 
-### 9.3 统一 FFmpeg 分发策略
+**实施结果（2026-09-01）**
 
-当前 NPM 包同时携带约 87 MB 的 `ffmpeg.exe` 和约 87 MB 的 `ffprobe.exe`，而运行时又能通过 `ffmpeg-sidecar` 自动下载，存在重复策略。应明确选择：
+项目继续只通过 NPM 分发。根 binary 和 `maya-core`、`maya-fs`、`maya-git`、`maya-media` 均已显式设置 `publish = false`，并统一继承 license/repository 元数据；发布链路不再执行 `cargo package` 或 `cargo publish`。`scripts/verify-release-config.ps1` 会通过 `cargo metadata` 检查所有成员的发布意图，避免新增成员遗漏配置。
+
+### 9.3 统一 FFmpeg 分发策略（已完成）
+
+审查时 NPM 包同时携带约 87 MB 的 `ffmpeg.exe` 和约 87 MB 的 `ffprobe.exe`，而运行时又能通过 `ffmpeg-sidecar` 自动下载，存在重复策略。应明确选择：
 
 - **随包携带**：离线可用，但包很大；建议按平台和架构拆分可选包；
 - **运行时下载**：包小，但需网络、缓存、校验、代理和下载失败处理。
 
 两种策略都合理，但不应在没有明确优先级和回退规则时同时存在。若保留下载，应校验来源、版本和文件哈希，并明确缓存位置。
 
-### 9.4 文档与 CLI 同步
+**实施结果（2026-09-01）**
 
-`pkg/README.md` 仍包含旧的单字母 flag 示例，与当前子命令接口不一致。建议由根 README 的受控片段生成包内 README，或在发布检查中执行示例快照测试，避免两个文档长期漂移。
+项目已选择“随 NPM 包携带”的 Windows x86_64 离线策略，不再运行时下载：
 
-## 10. 分阶段实施路线
+- 固定随包分发 FFmpeg/FFprobe `7.1.1-essentials_build-www.gyan.dev`，来源和架构记录在 `FFmpeg/README.md`；
+- `FFmpeg/checksums.sha256` 固定两个二进制的 SHA-256；组装脚本在复制前后都进行校验，失败立即终止打包；
+- `ffmpeg-sidecar` 已关闭默认 `download_ffmpeg` feature，代码删除 `auto_download` 路径，不再存在“随包携带 + 运行时下载”的双重策略；
+- 媒体用例在首次处理视频前校验与 `maya.exe` 同目录的 FFmpeg 和 FFprobe，缺失、不可读或哈希不一致都会返回非零错误，不执行不可信二进制；
+- release smoke test 会检查两个工具可执行、哈希正确并确实包含在 NPM 包内。
+
+该选择使 NPM 包仍约为 65 MB（解压约 178 MB），但换取无需网络、固定版本、可验证来源和确定的失败语义。
+
+### 9.4 文档与 CLI 同步（已完成）
+
+审查时 `pkg/README.md` 仍包含旧的单字母 flag 示例，与当前子命令接口不一致。建议由根 README 的受控片段生成包内 README，或在发布检查中执行示例快照测试，避免两个文档长期漂移。
+
+**实施结果（2026-09-01）**
+
+根 `README.md` 和 `pkg/README.md` 已同步为当前子命令接口，覆盖显式路径、`--quiet`、`--no-progress`、`--new-file`、`--jpeg-quality`、`--failure-policy`、Vite `--out-dir` 以及兼容别名。`scripts/package-smoke-test.ps1` 会执行根帮助及相关子命令帮助，校验文档不再出现旧单字母 flag 示例，并通过 `npm pack --dry-run --json` 检查实际包内容。
+
+## 10. 分阶段实施路线（已完成）
 
 ### 阶段 0：鲁棒性止血（已完成）
 
@@ -558,14 +596,23 @@ cargo build --release --locked
 - [x] 删除未使用公共 API 和 feature；
 - [x] 拆分大文件内部模块，保持外部命令兼容。
 
-### 阶段 3：发布可靠性（预计 1～3 天）
+### 阶段 3：发布可靠性（已完成）
 
-- 增加统一 verify 任务；
-- 修复格式基线并启用自动门禁；
-- 使用单一版本源；
-- 明确 `publish = false` 或补齐 crates.io 发布模型；
-- 选择 FFmpeg 分发策略；
-- 同步 NPM README，并增加 release smoke test。
+**完成摘要（2026-09-01）**
+
+- `cargo make verify` 已统一执行 fmt、严格 Clippy、workspace 测试、locked release build 和发布配置检查，且不会修改版本/源码、组装 NPM 包或触发外部发布；
+- Cargo workspace version 已成为唯一版本源，NPM 只在显式 package 流程中同步，普通 build 不再自动递增版本；
+- 所有 Cargo package 均显式禁止 crates.io 发布，NPM 发布仍需显式运行 `cargo make publish`；
+- FFmpeg 已收敛为随包携带策略：固定 7.1.1 Windows x86_64 版本，复制前后和运行时使用同一 SHA-256 清单校验，关闭运行时下载；
+- 根/NPM README 已同步当前 CLI；package smoke test 覆盖 CLI help、FFmpeg/FFprobe 可执行性与哈希、Cargo/NPM 版本及 NPM dry-run 内容；
+- 已通过 `cargo make verify`、`cargo make package` 和独立 `npm pack --dry-run --json`；当前 59 个测试全部通过，release 包含预期的 5 个文件。
+
+- [x] 增加统一 verify 任务；
+- [x] 修复格式基线并启用自动门禁；
+- [x] 使用单一版本源；
+- [x] 明确 `publish = false`；
+- [x] 选择并落实 FFmpeg 分发策略；
+- [x] 同步 NPM README，并增加 release smoke test。
 
 ## 11. 不建议引入的复杂度
 
@@ -579,7 +626,7 @@ cargo build --release --locked
 
 trait 应优先用于真正的外部边界，例如 `ProcessRunner`、需要流式更新的 `ProgressSink`，以及只有在原子写入测试确有需要时的 `FileOps`。其余代码优先使用普通结构体、枚举和纯函数。
 
-## 12. 最终验收清单
+## 12. 最终验收清单（已完成）
 
 完成本方案的核心部分后，项目应满足：
 
@@ -593,10 +640,10 @@ trait 应优先用于真正的外部边界，例如 `ProcessRunner`、需要流�
 - [x] 嵌套 `node_modules` 回归测试通过；
 - [x] Git 逻辑不依赖英文 stderr；
 - [x] 部分失败有稳定的报告和非零退出语义；
-- [ ] `fmt`、Clippy、测试和 release build 可通过一条 verify 命令完成；
-- [ ] Cargo 与 NPM 版本一致且来自单一版本源；
-- [ ] NPM 文档中的示例与实际 `maya --help` 一致；
-- [ ] FFmpeg 采用一种清晰、有校验、有失败处理的分发策略。
+- [x] `fmt`、Clippy、测试和 release build 可通过一条 verify 命令完成；
+- [x] Cargo 与 NPM 版本一致且来自单一版本源；
+- [x] NPM 文档中的示例与实际 `maya --help` 一致；
+- [x] FFmpeg 采用一种清晰、有校验、有失败处理的分发策略。
 
 ## 13. 推荐决策顺序
 

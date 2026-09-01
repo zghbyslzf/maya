@@ -1,67 +1,121 @@
-[tasks.update-cargo-version]
-command = "powershell"
-args = [
-  "-Command",
-  "$content = Get-Content 'Cargo.toml' -Raw -Encoding UTF8; $packageSection = [regex]::Match($content, '\\[package\\](.|\\n)*?(?=\\[)').Value; if(!$packageSection) { $packageSection = [regex]::Match($content, '\\[package\\](.|\\n)*').Value; }; $versionMatch = [regex]::Match($packageSection, 'version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\"'); if ($versionMatch.Success) { $major = $versionMatch.Groups[1].Value; $minor = $versionMatch.Groups[2].Value; $patch = [int]$versionMatch.Groups[3].Value + 1; $oldVersionStr = $versionMatch.Value; $newVersionStr = $oldVersionStr -replace '\"(\\d+)\\.(\\d+)\\.(\\d+)\"', ('\"' + $major + '.' + $minor + '.' + $patch + '\"'); $content = $content.Replace($oldVersionStr, $newVersionStr); $content | Out-File -FilePath 'Cargo.toml' -Encoding UTF8; Write-Host \"版本号已从 $major.$minor.$($patch-1) 更新到 $major.$minor.$patch\"; }"
-]
-workspace = false
-cwd = "."
-
-[tasks.build]
-dependencies = ["update-cargo-version"]
+[tasks.fmt-check]
 command = "cargo"
-args = ["build", "--release"]
-workspace = false # 关键修复：禁止在 workspace 成员中执行此任务
-cwd = "." # 确保命令在根目录执行
-
-[tasks.pkg]
-dependencies = ["build"]
-command = "cmd"
-args = ["/c", "if not exist pkg mkdir pkg"]
+args = ["fmt", "--all", "--", "--check"]
 workspace = false
 cwd = "."
 
-[tasks.move-release]
-dependencies = ["pkg"]
+[tasks.clippy]
+clear = true
+command = "cargo"
+args = ["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]
+workspace = false
+cwd = "."
+
+[tasks.test]
+clear = true
+command = "cargo"
+args = ["test", "--workspace"]
+workspace = false
+cwd = "."
+
+[tasks.release-build]
+command = "cargo"
+args = ["build", "--release", "--locked"]
+workspace = false
+cwd = "."
+
+[tasks.release-config-check]
 command = "powershell"
 args = [
-  "-Command",
-  "if (Test-Path pkg/release) { Remove-Item -Recurse -Force pkg/release }; New-Item -ItemType Directory -Force -Path pkg/release;  if (Test-Path target/release/maya.exe) { Copy-Item target/release/maya.exe pkg/release/; Write-Host '✅ 已复制 maya.exe' } else { Write-Error 'maya.exe not found in target/release' }; if (Test-Path FFmpeg/ffmpeg.exe) { Copy-Item FFmpeg/ffmpeg.exe pkg/release/; Write-Host '✅ 已复制 FFmpeg'} else {Write-Error 'FFmpeg.exe not found in target/release'}; if (Test-Path FFmpeg/ffprobe.exe) { Copy-Item FFmpeg/ffprobe.exe pkg/release/; Write-Host '✅ 已复制 ffprobe'}else { Write-Error 'ffprobe.exe not found in target/release' };"
+  "-NoLogo",
+  "-NoProfile",
+  "-NonInteractive",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-File",
+  "scripts/verify-release-config.ps1",
 ]
 workspace = false
 cwd = "."
 
-[tasks.update-version]
-dependencies = ["move-release"]
+[tasks.verify]
+dependencies = ["fmt-check", "clippy", "test", "release-build", "release-config-check"]
+workspace = false
+cwd = "."
+
+# 保留原有 build 入口，但普通构建不再修改版本或组装发布包。
+[tasks.build]
+clear = true
+dependencies = ["release-build"]
+workspace = false
+cwd = "."
+
+[tasks.sync-package-version]
+dependencies = ["verify"]
 command = "powershell"
 args = [
-  "-Command",
-  "$pkgJson = Get-Content 'pkg/package.json' | ConvertFrom-Json; $version = [version]$pkgJson.version; $pkgJson.version = \"$($version.Major).$($version.Minor).$($version.Build + 1)\"; $pkgJson | ConvertTo-Json -Depth 100 | ForEach-Object { $_ -replace '    ', '  ' } | Set-Content 'pkg/package.json'"
+  "-NoLogo",
+  "-NoProfile",
+  "-NonInteractive",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-File",
+  "scripts/sync-package-version.ps1",
 ]
 workspace = false
 cwd = "."
 
+[tasks.assemble-package]
+dependencies = ["sync-package-version"]
+command = "powershell"
+args = [
+  "-NoLogo",
+  "-NoProfile",
+  "-NonInteractive",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-File",
+  "scripts/assemble-package.ps1",
+]
+workspace = false
+cwd = "."
 
+[tasks.package-smoke-test]
+dependencies = ["assemble-package"]
+command = "powershell"
+args = [
+  "-NoLogo",
+  "-NoProfile",
+  "-NonInteractive",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-File",
+  "scripts/package-smoke-test.ps1",
+]
+workspace = false
+cwd = "."
+
+[tasks.package]
+clear = true
+dependencies = ["package-smoke-test"]
+workspace = false
+cwd = "."
+
+# 发布始终是显式任务，不会被 build、verify 或 package 隐式触发。
 [tasks.npm-publish]
-dependencies = ["update-version"]
+dependencies = ["package"]
 command = "npm.cmd"
 args = ["publish", "--registry=https://registry.npmjs.org"]
 workspace = false
 cwd = "pkg"
 
-[tasks.publish-all]
+[tasks.publish]
+clear = true
 dependencies = ["npm-publish"]
-command = "powershell"
-args = ["-Command", "Write-Host 'Publish completed!'"]
 workspace = false
 cwd = "."
 
-[tasks.build-push]
-command = "powershell"
-args = ["-Command", "Write-Host 'Build and WASM bindgen completed!'"]
-dependencies = ["build", "move-release", "update-version", "npm-publish", "publish-all"]
+[tasks.publish-all]
+dependencies = ["publish"]
 workspace = false
 cwd = "."
-
-
-

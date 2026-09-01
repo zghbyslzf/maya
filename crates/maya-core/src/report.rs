@@ -49,6 +49,7 @@ impl RemovalReport {
 pub struct ArchiveReport {
     pub archive_path: PathBuf,
     pub files_added: usize,
+    pub directories_added: usize,
     pub source_bytes: u64,
     pub archive_bytes: u64,
 }

@@ -38,9 +38,10 @@ impl Presenter {
     pub fn archive(&self, report: &ArchiveReport) {
         if !self.quiet {
             println!(
-                "已创建归档 {}（{} 个文件，{} 字节 -> {} 字节）",
+                "已创建归档 {}（{} 个文件，{} 个空目录，{} 字节 -> {} 字节）",
                 report.archive_path.display(),
                 report.files_added,
+                report.directories_added,
                 report.source_bytes,
                 report.archive_bytes
             );
