@@ -34,6 +34,16 @@ $help = & $mayaExe --help | Out-String
 if ($LASTEXITCODE -ne 0) {
     throw 'maya.exe --help failed'
 }
+
+$metadata = & cargo metadata --no-deps --format-version 1 --manifest-path (Join-Path $repoRoot 'Cargo.toml') | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) {
+    throw 'cargo metadata failed'
+}
+$cargoVersion = ($metadata.packages | Where-Object { $_.name -eq 'maya' } | Select-Object -First 1).version
+$binaryVersion = (& $mayaExe --version | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $binaryVersion -ne "maya $cargoVersion") {
+    throw "Maya executable version mismatch: expected maya $cargoVersion, got '$binaryVersion'"
+}
 foreach ($command in @('clean', 'git', 'pack', 'optimize', 'transform')) {
     if ($help -notmatch "(?m)^\s*$command\s") {
         throw "maya.exe --help is missing subcommand: $command"
@@ -107,8 +117,6 @@ if ($paths.Count -ne 5) {
     throw "NPM package contains unexpected files: $($paths -join ', ')"
 }
 
-$metadata = & cargo metadata --no-deps --format-version 1 --manifest-path (Join-Path $repoRoot 'Cargo.toml') | ConvertFrom-Json
-$cargoVersion = ($metadata.packages | Where-Object { $_.name -eq 'maya' } | Select-Object -First 1).version
 $npmVersion = (Get-Content -Raw -LiteralPath (Join-Path $packageDir 'package.json') | ConvertFrom-Json).version
 if ($cargoVersion -ne $npmVersion) {
     throw "Cargo and NPM versions differ: $cargoVersion / $npmVersion"

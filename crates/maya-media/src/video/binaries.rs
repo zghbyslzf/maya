@@ -31,7 +31,7 @@ fn verify_binary(path: &Path, expected: &str, name: &str) -> Result<()> {
             path.display()
         ))
     })?;
-    if actual != expected {
+    if !actual.eq_ignore_ascii_case(expected) {
         return Err(Error::video_conversion(format!(
             "随包分发的 {name} 完整性校验失败（路径: {}；期望 SHA-256: {expected}；实际: {actual}）。请重新安装 maya-cli-rs",
             path.display()
@@ -68,6 +68,7 @@ mod tests {
         let hash = sha256_file(&binary).unwrap();
 
         assert!(verify_binary(&binary, &hash, "测试工具").is_ok());
+        assert!(verify_binary(&binary, &hash.to_ascii_lowercase(), "测试工具").is_ok());
         assert!(verify_binary(&binary, &"0".repeat(64), "测试工具")
             .unwrap_err()
             .to_string()

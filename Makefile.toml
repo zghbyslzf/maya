@@ -19,8 +19,16 @@ workspace = false
 cwd = "."
 
 [tasks.release-build]
-command = "cargo"
-args = ["build", "--release", "--locked"]
+command = "powershell"
+args = [
+  "-NoLogo",
+  "-NoProfile",
+  "-NonInteractive",
+  "-ExecutionPolicy",
+  "Bypass",
+  "-File",
+  "scripts/build-release.ps1",
+]
 workspace = false
 cwd = "."
 

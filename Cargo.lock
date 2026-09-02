@@ -980,6 +980,7 @@ dependencies = [
  "maya-git",
  "maya-media",
  "predicates",
+ "sha2",
  "tempfile",
  "tokio",
 ]

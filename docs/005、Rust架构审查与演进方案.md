@@ -557,6 +557,13 @@ cargo build --release --locked
 - 媒体用例在首次处理视频前校验与 `maya.exe` 同目录的 FFmpeg 和 FFprobe，缺失、不可读或哈希不一致都会返回非零错误，不执行不可信二进制；
 - release smoke test 会检查两个工具可执行、哈希正确并确实包含在 NPM 包内。
 
+**发布可靠性复审修复（2026-09-02）**
+
+- 根 package 的 `build.rs` 在 release 构建期间校验源 sidecar，并把 FFmpeg/FFprobe 复制到 Cargo 实际产出的 `maya.exe` 同级目录，直接运行 `cargo build --release` 产物也可使用视频转换；
+- Rust 运行时 SHA-256 比较改为忽略 ASCII 大小写，与 PowerShell 构建/发布检查保持一致，并补充小写哈希回归断言；
+- release build 通过 Cargo JSON 编译消息记录本次 executable 的真实路径和 SHA-256，不再猜测 `target/release/maya.exe`；组装时验证记录哈希和 `maya --version`，支持 `CARGO_TARGET_DIR`、`CARGO_BUILD_TARGET` 及二者组合，避免误打包残留旧二进制；
+- 已用 `CARGO_TARGET_DIR=target/custom-release-test` 和 `CARGO_BUILD_TARGET=x86_64-pc-windows-msvc` 实测：三份 exe 被部署到实际 target release 目录，随后组装及 NPM 冒烟测试通过。
+
 该选择使 NPM 包仍约为 65 MB（解压约 178 MB），但换取无需网络、固定版本、可验证来源和确定的失败语义。
 
 ### 9.4 文档与 CLI 同步（已完成）
